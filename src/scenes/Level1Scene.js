@@ -14,7 +14,8 @@ export default class Level1Scene extends BaseLevelScene {
       mapKey: 'nivel1',
       tilesetName: 'desierto',
       tilesetImageKey: 'desiertoTiles',
-      levelMusicMood: 'desierto'
+      levelMusicMood: 'desierto',
+      musicMood: 'calm'
     });
 
     this.requiredKills = 8;
@@ -22,24 +23,6 @@ export default class Level1Scene extends BaseLevelScene {
     this.spawnRandomEnemies();
     this.spawnRandomCoinCaches();
     this.showObjective('Objetivo: explora el desierto, elimina enemigos y busca el portal.');
-  }
-
-  showObjective(text) {
-    const objective = this.add.text(480, 78, text, {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '18px',
-      color: '#fff2cc',
-      backgroundColor: 'rgba(54, 29, 12, 0.78)',
-      padding: { left: 12, right: 12, top: 8, bottom: 8 }
-    }).setScrollFactor(0).setOrigin(0.5).setDepth(1100);
-
-    this.tweens.add({
-      targets: objective,
-      alpha: 0,
-      delay: 4200,
-      duration: 700,
-      onComplete: () => objective.destroy()
-    });
   }
 
   checkLevelCompletion() {
@@ -63,9 +46,9 @@ export default class Level1Scene extends BaseLevelScene {
       'spider',
       'spider',
       'spider',
-      'scorpion',
-      'scorpion',
-      Phaser.Math.RND.pick(['spider', 'scorpion'])
+      'spider',
+      'spider',
+      'spider'
     ]);
     const points = this.getRandomSafePoints(enemyPlan.length, {
       margin: 150,

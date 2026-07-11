@@ -9,6 +9,7 @@ export default class TiendaScene extends Phaser.Scene {
 
   create(data) {
     this.nextLevelScene = data.nextLevelScene || 'Level2Scene';
+    this.levelCompleted = data.levelCompleted || 1;
     this.cameras.main.setBackgroundColor('#20130b');
     this.add.tileSprite(480, 270, 960, 540, 'desiertoTiles').setAlpha(0.11);
 
@@ -36,7 +37,11 @@ export default class TiendaScene extends Phaser.Scene {
     this.renderUpgrades();
     this.refreshInfo();
 
-    addButton(this, 480, 488, 'Continuar al Nivel 2', () => {
+    const continueLabel = this.nextLevelScene === 'VictoryScene'
+      ? 'Finalizar demo'
+      : `Continuar al Nivel ${this.levelCompleted + 1}`;
+
+    addButton(this, 480, 488, continueLabel, () => {
       const run = getRun(this);
       run.hp = run.hpMax;
       saveRun(this, run);

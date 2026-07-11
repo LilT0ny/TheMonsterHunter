@@ -1,4 +1,5 @@
 import { getDerivedStats, getRun } from '../core/runState.js';
+import { getAudio } from '../core/audio.js';
 
 export default class UIScene extends Phaser.Scene {
   constructor() {
@@ -24,6 +25,17 @@ export default class UIScene extends Phaser.Scene {
       fontSize: '12px',
       color: '#ffffff'
     }).setOrigin(0.5).setDepth(1003);
+
+    const audio = getAudio(this);
+    this.muteDot = this.add.circle(936, 22, 7, 0x63c46a)
+      .setDepth(1003)
+      .setInteractive({ useHandCursor: true });
+    const refreshMuteDot = () => this.muteDot.setFillStyle(audio?.isMuted() ? 0xc0392b : 0x63c46a);
+    refreshMuteDot();
+    this.muteDot.on('pointerdown', () => {
+      audio?.toggleMute();
+      refreshMuteDot();
+    });
   }
 
   update() {

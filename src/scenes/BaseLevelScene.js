@@ -9,6 +9,14 @@ import {
   setLevel
 } from '../core/runState.js';
 import { addKeyboardHint } from '../core/ui.js';
+import { getAudio } from '../core/audio.js';
+
+const ELITE_VISUALS = {
+  mummy_giant: { scale: 1.6, tint: 0x8a6f45 },
+  scorpion_elite: { scale: 1.4, tint: 0xffb347 },
+  golem_fragment: { scale: 0.6 },
+  sand_spirit: { scale: 1, alpha: 0.55 }
+};
 
 export default class BaseLevelScene extends Phaser.Scene {
   constructor(key) {
@@ -18,6 +26,8 @@ export default class BaseLevelScene extends Phaser.Scene {
     this.lastAimAngle = 0;
     this.nextPlayerDamageAt = 0;
     this.nextShotAt = 0;
+    this.nextDashAt = 0;
+    this.nextFootstepAt = 0;
   }
 
   createLevel({
@@ -26,12 +36,15 @@ export default class BaseLevelScene extends Phaser.Scene {
     mapKey,
     tilesetName,
     tilesetImageKey,
-    levelMusicMood = 'desierto'
+    levelMusicMood = 'desierto',
+    musicMood = 'calm'
   }) {
     this.levelFinished = false;
     this.enemyKills = 0;
     this.nextPlayerDamageAt = 0;
     this.nextShotAt = 0;
+    this.nextDashAt = 0;
+    this.nextFootstepAt = 0;
     this.levelTitle = title;
     this.levelNumber = levelNumber;
     setLevel(this, levelNumber);
@@ -44,6 +57,10 @@ export default class BaseLevelScene extends Phaser.Scene {
     this.createLevelTexts(levelMusicMood);
     this.createInputs();
     this.scene.launch('UIScene', { levelName: title });
+
+    const audio = getAudio(this);
+    audio?.startMusic(musicMood);
+    audio?.startFoley('wind');
   }
 
   createMap(mapKey, tilesetName, tilesetImageKey) {
@@ -60,6 +77,12 @@ export default class BaseLevelScene extends Phaser.Scene {
     if (danger) {
       this.dangerLayer = this.map.createLayer('danger', this.tileset, 0, 0).setDepth(3).setAlpha(0.9);
       this.dangerLayer.setCollisionByExclusion([-1]);
+    }
+
+    const lowWalls = this.map.getLayer('lowwalls');
+    if (lowWalls) {
+      this.lowWallsLayer = this.map.createLayer('lowwalls', this.tileset, 0, 0).setDepth(4);
+      this.lowWallsLayer.setCollisionByExclusion([-1]);
     }
 
     this.objects = this.map.getObjectLayer('objects')?.objects || [];
@@ -96,6 +119,11 @@ export default class BaseLevelScene extends Phaser.Scene {
       this.physics.add.collider(this.enemyProjectiles, this.wallsLayer, (bolt) => bolt.destroy());
     }
 
+    if (this.lowWallsLayer) {
+      this.physics.add.collider(this.enemies, this.lowWallsLayer);
+      this.physics.add.collider(this.player, this.lowWallsLayer, null, () => !this.isDashing(), this);
+    }
+
     this.physics.add.overlap(this.arrows, this.enemies, this.handleArrowEnemy, null, this);
     this.physics.add.overlap(this.player, this.coins, this.collectCoin, null, this);
     this.physics.add.overlap(this.player, this.enemies, this.handlePlayerEnemy, null, this);
@@ -114,13 +142,58 @@ export default class BaseLevelScene extends Phaser.Scene {
     addKeyboardHint(this);
   }
 
+  showObjective(text, options = {}) {
+    const {
+      backgroundColor = 'rgba(54, 29, 12, 0.78)',
+      delay = 4500,
+      duration = 700,
+      wordWrapWidth = 620
+    } = options;
+
+    const objective = this.add.text(480, 78, text, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '18px',
+      color: '#fff2cc',
+      backgroundColor,
+      padding: { left: 12, right: 12, top: 8, bottom: 8 },
+      wordWrap: { width: wordWrapWidth }
+    }).setScrollFactor(0).setOrigin(0.5).setDepth(1100);
+
+    this.tweens.add({
+      targets: objective,
+      alpha: 0,
+      delay,
+      duration,
+      onComplete: () => objective.destroy()
+    });
+
+    return objective;
+  }
+
+  fadeOutAndDestroy(gameObject, duration) {
+    this.tweens.add({
+      targets: gameObject,
+      alpha: 0,
+      duration,
+      onComplete: () => gameObject.destroy()
+    });
+  }
+
+  announceBossPhase(intensity, extraSfx = null) {
+    const audio = getAudio(this);
+    audio?.playSfx('bossPhase');
+    if (extraSfx) audio?.playSfx(extraSfx);
+    audio?.setMusicIntensity(intensity);
+  }
+
   createInputs() {
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE,ESC');
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE,ESC,SHIFT');
 
     this.input.on('pointerdown', (pointer) => this.tryShoot(pointer));
 
     this.keys.SPACE.on('down', () => this.tryShoot(null));
+    this.keys.SHIFT.on('down', () => this.tryDash());
     this.keys.ESC.on('down', () => {
       this.scene.stop('UIScene');
       this.scene.start('MenuScene');
@@ -137,10 +210,13 @@ export default class BaseLevelScene extends Phaser.Scene {
   }
 
   updatePlayer(time) {
+    if (this.isDashing()) return;
+
     const run = getRun(this);
     const stats = getDerivedStats(run);
     const cursedUntil = this.player.getData('cursedUntil') || 0;
-    const speed = time < cursedUntil ? stats.moveSpeed * 0.55 : stats.moveSpeed;
+    const curseFactor = this.player.getData('curseFactor') ?? 0.55;
+    const speed = time < cursedUntil ? stats.moveSpeed * curseFactor : stats.moveSpeed;
 
     let vx = 0;
     let vy = 0;
@@ -154,9 +230,31 @@ export default class BaseLevelScene extends Phaser.Scene {
       const vector = new Phaser.Math.Vector2(vx, vy).normalize().scale(speed);
       this.player.setVelocity(vector.x, vector.y);
       this.lastAimAngle = Math.atan2(vector.y, vector.x);
+
+      if (time > this.nextFootstepAt) {
+        this.nextFootstepAt = time + 320;
+        getAudio(this)?.playSfx('footstep');
+      }
     } else {
       this.player.setVelocity(0, 0);
     }
+  }
+
+  isDashing() {
+    return this.time.now < (this.player?.getData('dashingUntil') || 0);
+  }
+
+  tryDash() {
+    const now = this.time.now;
+    if (!this.player || this.levelFinished || now < this.nextDashAt || this.isDashing()) return;
+
+    const DASH_SPEED = 620;
+    const DASH_DURATION = 180;
+    const DASH_COOLDOWN = 1200;
+
+    this.physics.velocityFromRotation(this.lastAimAngle, DASH_SPEED, this.player.body.velocity);
+    this.player.setData('dashingUntil', now + DASH_DURATION);
+    this.nextDashAt = now + DASH_COOLDOWN;
   }
 
   tryShoot(pointer) {
@@ -171,6 +269,8 @@ export default class BaseLevelScene extends Phaser.Scene {
       angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y);
       this.lastAimAngle = angle;
     }
+
+    getAudio(this)?.playSfx('shoot');
 
     const skills = run.skills;
     if (skills.includes('rain')) {
@@ -252,16 +352,21 @@ export default class BaseLevelScene extends Phaser.Scene {
         this.physics.velocityFromRotation(angle + wobble, speed, enemy.body.velocity);
       }
 
-      if (type === 'scorpion') {
+      if (type === 'scorpion' || type === 'scorpion_elite') {
         if (distance > 180) {
           this.physics.velocityFromRotation(angle, speed * 0.55, enemy.body.velocity);
         } else {
           enemy.setVelocity(0, 0);
         }
-        this.enemyShoot(enemy, 'enemyBolt', 260, 11, 1450);
+
+        if (type === 'scorpion_elite') {
+          this.enemyShoot(enemy, 'enemyBolt', 300, 16, 950);
+        } else {
+          this.enemyShoot(enemy, 'enemyBolt', 260, 11, 1450);
+        }
       }
 
-      if (type === 'mummy') {
+      if (type === 'mummy' || type === 'mummy_giant') {
         this.physics.velocityFromRotation(angle, speed * 0.65, enemy.body.velocity);
       }
 
@@ -269,6 +374,25 @@ export default class BaseLevelScene extends Phaser.Scene {
         const orbit = Math.sin(time / 350 + (enemy.getData('phase') || 0)) * 1.2;
         this.physics.velocityFromRotation(angle + orbit, speed * 0.8, enemy.body.velocity);
         this.enemyShoot(enemy, 'venom', 230, 13, 1650);
+      }
+
+      if (type === 'golem_fragment') {
+        let wanderAngle = enemy.getData('wanderAngle');
+        const wanderUntil = enemy.getData('wanderUntil') || 0;
+        if (wanderAngle === undefined || time > wanderUntil) {
+          wanderAngle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+          enemy.setData('wanderAngle', wanderAngle);
+          enemy.setData('wanderUntil', time + Phaser.Math.Between(800, 1800));
+        }
+        this.physics.velocityFromRotation(wanderAngle, speed * 0.6, enemy.body.velocity);
+      }
+
+      if (type === 'sand_spirit') {
+        this.physics.velocityFromRotation(angle, speed * 0.5, enemy.body.velocity);
+      }
+
+      if (type === 'guardian') {
+        enemy.setVelocity(0, 0);
       }
     });
   }
@@ -305,15 +429,33 @@ export default class BaseLevelScene extends Phaser.Scene {
   handleArrowEnemy(arrow, enemy) {
     if (!arrow.active || !enemy.active) return;
 
+    const shieldFacing = enemy.getData('shieldFacing');
+    if (shieldFacing !== undefined) {
+      const shieldArc = enemy.getData('shieldArc') || 1.1;
+      const originAngle = Phaser.Math.Angle.Between(enemy.x, enemy.y, arrow.x, arrow.y);
+      const blocked = Math.abs(Phaser.Math.Angle.Wrap(originAngle - shieldFacing)) < shieldArc;
+      if (blocked) {
+        this.disableSprite(arrow);
+        return;
+      }
+    }
+
     const run = getRun(this);
     const damage = arrow.getData('damage') || 20;
-    this.damageEnemy(enemy, damage);
+    const vulnerableSkills = enemy.getData('vulnerableSkills');
+    const immune = vulnerableSkills && !vulnerableSkills.some((skill) => run.skills.includes(skill));
 
-    if (run.skills.includes('fire')) {
+    if (!immune) {
+      this.damageEnemy(enemy, damage);
+    }
+
+    const canBurn = !vulnerableSkills || vulnerableSkills.includes('fire');
+    if (canBurn && run.skills.includes('fire')) {
       this.applyBurn(enemy, 3, Math.max(4, Math.round(damage * 0.22)));
     }
 
-    if (run.skills.includes('ice')) {
+    const canSlow = !vulnerableSkills || vulnerableSkills.includes('ice');
+    if (canSlow && run.skills.includes('ice')) {
       enemy.setData('slowUntil', this.time.now + 2000);
     }
 
@@ -334,15 +476,56 @@ export default class BaseLevelScene extends Phaser.Scene {
     }
   }
 
+  canDamageEnemy(enemy, originX, originY) {
+    const shieldFacing = enemy.getData('shieldFacing');
+    if (shieldFacing !== undefined) {
+      const shieldArc = enemy.getData('shieldArc') || 1.1;
+      const originAngle = Phaser.Math.Angle.Between(enemy.x, enemy.y, originX, originY);
+      if (Math.abs(Phaser.Math.Angle.Wrap(originAngle - shieldFacing)) < shieldArc) {
+        return false;
+      }
+    }
+
+    const vulnerableSkills = enemy.getData('vulnerableSkills');
+    if (vulnerableSkills) {
+      const run = getRun(this);
+      if (!vulnerableSkills.some((skill) => run.skills.includes(skill))) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   damageEnemy(enemy, amount) {
     if (!enemy.active) return;
-    const hp = (enemy.getData('hp') || 1) - amount;
+    const invulnerableUntil = enemy.getData('invulnerableUntil') || 0;
+    if (this.time.now < invulnerableUntil) return;
+
+    const minHp = enemy.getData('minHp') || 0;
+    const rawHp = (enemy.getData('hp') || 1) - amount;
+    const hp = minHp > 0 ? Math.max(rawHp, minHp) : rawHp;
     enemy.setData('hp', hp);
     enemy.setTint(0xfff2a8);
-    this.time.delayedCall(80, () => enemy.active && enemy.clearTint());
+    this.time.delayedCall(80, () => enemy.active && this.resetEnemyTint(enemy));
+    getAudio(this)?.playSfx('hit');
+
+    if (minHp > 0 && rawHp <= minHp) {
+      this.events.emit('enemyHpFloor', enemy);
+      return;
+    }
 
     if (hp <= 0) {
       this.killEnemy(enemy);
+    }
+  }
+
+  resetEnemyTint(enemy) {
+    const baseTint = enemy.getData('baseTint');
+    if (baseTint) {
+      enemy.setTint(baseTint);
+    } else {
+      enemy.clearTint();
     }
   }
 
@@ -352,7 +535,7 @@ export default class BaseLevelScene extends Phaser.Scene {
         if (enemy.active) {
           enemy.setTint(0xff5d2a);
           this.damageEnemy(enemy, tickDamage);
-          this.time.delayedCall(90, () => enemy.active && enemy.clearTint());
+          this.time.delayedCall(90, () => enemy.active && this.resetEnemyTint(enemy));
         }
       });
     }
@@ -370,7 +553,7 @@ export default class BaseLevelScene extends Phaser.Scene {
 
     this.enemies.children.each((enemy) => {
       if (!enemy.active) return;
-      if (Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y) <= 64) {
+      if (Phaser.Math.Distance.Between(x, y, enemy.x, enemy.y) <= 64 && this.canDamageEnemy(enemy, x, y)) {
         this.damageEnemy(enemy, damage);
       }
     });
@@ -385,6 +568,7 @@ export default class BaseLevelScene extends Phaser.Scene {
       .slice(0, 2);
 
     chained.forEach(({ enemy }) => {
+      if (!this.canDamageEnemy(enemy, originEnemy.x, originEnemy.y)) return;
       const line = this.add.line(0, 0, originEnemy.x, originEnemy.y, enemy.x, enemy.y, 0x9fe8ff, 0.9)
         .setOrigin(0, 0)
         .setDepth(30);
@@ -398,9 +582,14 @@ export default class BaseLevelScene extends Phaser.Scene {
     const run = getRun(this);
     const stats = getDerivedStats(run);
     const score = ENEMY_SCORE[type] || 10;
-    const coinCount = Math.max(1, Math.round((enemy.getData('coinDrop') || 1) * stats.luckMultiplier));
+    const coinDrop = enemy.getData('coinDrop');
+    const effectiveDrop = coinDrop === undefined ? 1 : coinDrop;
 
-    this.spawnCoins(enemy.x, enemy.y, coinCount);
+    if (effectiveDrop > 0) {
+      const coinCount = Math.max(1, Math.round(effectiveDrop * stats.luckMultiplier));
+      this.spawnCoins(enemy.x, enemy.y, coinCount);
+    }
+
     addScore(this, score);
     this.enemyKills += 1;
     this.disableSprite(enemy);
@@ -421,7 +610,7 @@ export default class BaseLevelScene extends Phaser.Scene {
     }
   }
 
-  spawnCoinCache(x, y, count = 5) {
+  spawnCoinCache(x, y, count = 5, value = 1) {
     for (let i = 0; i < count; i += 1) {
       const angle = (Math.PI * 2 * i) / count;
       const radius = Phaser.Math.Between(10, 28);
@@ -430,7 +619,7 @@ export default class BaseLevelScene extends Phaser.Scene {
       coin.setActive(true).setVisible(true).setDepth(14);
       coin.body.enable = true;
       coin.body.setAllowGravity(false);
-      coin.setData('value', 1);
+      coin.setData('value', value);
       coin.setVelocity(0, 0);
     }
   }
@@ -441,6 +630,7 @@ export default class BaseLevelScene extends Phaser.Scene {
     addCoins(this, value);
     addScore(this, value);
     this.disableSprite(coin);
+    getAudio(this)?.playSfx('coin');
   }
 
   handlePlayerEnemy(player, enemy) {
@@ -449,6 +639,11 @@ export default class BaseLevelScene extends Phaser.Scene {
     this.applyDamageToPlayer(enemy.getData('touchDamage') || 10);
     if (type === 'mummy') {
       this.player.setData('cursedUntil', this.time.now + 2000);
+      this.player.setData('curseFactor', 0.55);
+    }
+    if (type === 'mummy_giant') {
+      this.player.setData('cursedUntil', this.time.now + 3200);
+      this.player.setData('curseFactor', 0.4);
     }
   }
 
@@ -460,13 +655,14 @@ export default class BaseLevelScene extends Phaser.Scene {
 
   applyDamageToPlayer(amount) {
     const now = this.time.now;
-    if (now < this.nextPlayerDamageAt || this.levelFinished) return;
+    if (now < this.nextPlayerDamageAt || this.levelFinished || this.isDashing()) return;
 
     const { run, finalDamage } = damagePlayer(this, amount);
     this.nextPlayerDamageAt = now + 650;
     this.player.setTint(0xff5b5b);
     this.cameras.main.shake(120, 0.006);
     this.time.delayedCall(120, () => this.player?.clearTint());
+    getAudio(this)?.playSfx('damage');
 
     const floating = this.add.text(this.player.x, this.player.y - 28, `-${finalDamage}`, {
       fontFamily: 'Arial Black, Arial, sans-serif',
@@ -482,19 +678,33 @@ export default class BaseLevelScene extends Phaser.Scene {
     }
   }
 
-  spawnEnemy(type, x, y) {
+  spawnEnemy(type, x, y, extraData = {}) {
     const texture = {
       spider: 'spider',
       scorpion: 'scorpion',
+      scorpion_elite: 'scorpion',
       mummy: 'mummy',
-      serpent: 'serpent'
+      serpent: 'serpent',
+      mummy_giant: 'mummy',
+      boss_golem: 'golem',
+      golem_fragment: 'golem',
+      sand_spirit: 'spirit',
+      guardian: 'guardian',
+      boss_king_scorpion: 'kingScorpion'
     }[type] || 'spider';
 
     const data = {
       spider: { hp: 35, speed: 95, touchDamage: 8, coinDrop: 1 },
       scorpion: { hp: 55, speed: 70, touchDamage: 10, coinDrop: 2 },
+      scorpion_elite: { hp: 110, speed: 75, touchDamage: 14, coinDrop: 4 },
       mummy: { hp: 80, speed: 70, touchDamage: 12, coinDrop: 2 },
-      serpent: { hp: 62, speed: 105, touchDamage: 10, coinDrop: 2 }
+      serpent: { hp: 62, speed: 105, touchDamage: 10, coinDrop: 2 },
+      mummy_giant: { hp: 200, speed: 55, touchDamage: 16, coinDrop: 5 },
+      boss_golem: { hp: 900, speed: 60, touchDamage: 14, coinDrop: 0 },
+      golem_fragment: { hp: 150, speed: 65, touchDamage: 12, coinDrop: 0 },
+      sand_spirit: { hp: 40, speed: 55, touchDamage: 10, coinDrop: 0, vulnerableSkills: ['electric', 'explosive'] },
+      guardian: { hp: 300, speed: 0, touchDamage: 18, coinDrop: 4, shieldArc: 1.1 },
+      boss_king_scorpion: { hp: 1400, speed: 50, touchDamage: 20, coinDrop: 0 }
     }[type] || { hp: 35, speed: 85, touchDamage: 8, coinDrop: 1 };
 
     const enemy = this.enemies.create(x, y, texture)
@@ -504,10 +714,29 @@ export default class BaseLevelScene extends Phaser.Scene {
     enemy.setData({
       type,
       ...data,
+      ...extraData,
       phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
       slowUntil: 0,
       nextShotAt: this.time.now + Phaser.Math.Between(600, 1600)
     });
+
+    const visual = ELITE_VISUALS[type];
+    if (visual) {
+      enemy.setScale(visual.scale);
+      enemy.body.setSize(enemy.body.width * visual.scale, enemy.body.height * visual.scale);
+      if (visual.tint) {
+        enemy.setData('baseTint', visual.tint);
+        enemy.setTint(visual.tint);
+      }
+      if (visual.alpha !== undefined) {
+        enemy.setAlpha(visual.alpha);
+      }
+    }
+
+    if (type === 'guardian' && enemy.getData('shieldFacing') !== undefined) {
+      enemy.setRotation(enemy.getData('shieldFacing'));
+    }
+
     return enemy;
   }
 
@@ -518,6 +747,14 @@ export default class BaseLevelScene extends Phaser.Scene {
       if (allowed.has(type)) {
         this.spawnEnemy(type, object.x, object.y);
       }
+    });
+  }
+
+  spawnGuardiansFromMap() {
+    this.findObjects('guardian').forEach((object) => {
+      this.spawnEnemy('guardian', object.x, object.y, {
+        shieldFacing: Phaser.Math.DegToRad(object.rotation || 0)
+      });
     });
   }
 
@@ -600,6 +837,78 @@ export default class BaseLevelScene extends Phaser.Scene {
     return Boolean(tile && tile.index > 0);
   }
 
+  createDangerZoneDamage(damage, cooldown, warningText) {
+    if (!this.dangerLayer) return;
+    this.dangerLayer.setCollisionByExclusion([-1, 0]);
+    this.dangerZoneDamage = damage;
+    this.dangerZoneCooldown = cooldown;
+    this.dangerZoneWarningMessage = warningText;
+    this.nextDangerZoneDamageAt = 0;
+    this.dangerZoneWarningText = this.add.text(480, 156, '', {
+      fontFamily: 'Arial Black, Arial, sans-serif',
+      fontSize: '20px',
+      color: '#ffcf8a',
+      stroke: '#4f1008',
+      strokeThickness: 4
+    }).setScrollFactor(0).setOrigin(0.5).setDepth(1100).setAlpha(0);
+  }
+
+  updateDangerZoneDamage(time) {
+    if (!this.dangerLayer || !this.player || this.levelFinished) return;
+
+    const nearDanger = this.isPlayerNearDangerZone();
+    if (this.dangerZoneWarningText) {
+      this.dangerZoneWarningText.setText(nearDanger ? this.dangerZoneWarningMessage : '');
+      this.dangerZoneWarningText.setAlpha(nearDanger ? 1 : 0);
+    }
+
+    if (!nearDanger || time < this.nextDangerZoneDamageAt) return;
+
+    this.nextDangerZoneDamageAt = time + this.dangerZoneCooldown;
+    this.applyDamageToPlayer(this.dangerZoneDamage);
+  }
+
+  isPlayerNearDangerZone(proximity = 10) {
+    const body = this.player.body;
+    const tileWidth = this.map.tileWidth;
+    const tileHeight = this.map.tileHeight;
+    const bounds = {
+      left: body.x - proximity,
+      right: body.x + body.width + proximity,
+      top: body.y - proximity,
+      bottom: body.y + body.height + proximity
+    };
+
+    const minTileX = Math.max(0, Math.floor(bounds.left / tileWidth));
+    const maxTileX = Math.min(this.map.width - 1, Math.floor(bounds.right / tileWidth));
+    const minTileY = Math.max(0, Math.floor(bounds.top / tileHeight));
+    const maxTileY = Math.min(this.map.height - 1, Math.floor(bounds.bottom / tileHeight));
+
+    for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+      for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+        const tile = this.dangerLayer.getTileAt(tileX, tileY);
+        if (tile && tile.index > 0 && this.isBodyNearTile(body, tileX, tileY, proximity)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  isBodyNearTile(body, tileX, tileY, proximity = 10) {
+    const tileLeft = tileX * this.map.tileWidth;
+    const tileRight = tileLeft + this.map.tileWidth;
+    const tileTop = tileY * this.map.tileHeight;
+    const tileBottom = tileTop + this.map.tileHeight;
+    const bodyRight = body.x + body.width;
+    const bodyBottom = body.y + body.height;
+    const dx = Math.max(tileLeft - bodyRight, body.x - tileRight, 0);
+    const dy = Math.max(tileTop - bodyBottom, body.y - tileBottom, 0);
+
+    return Math.hypot(dx, dy) <= proximity;
+  }
+
   createPortal(nextCallback, position = null) {
     if (this.portal) return;
     const portalObj = position || this.findObject('portal') || { x: this.map.widthInPixels - 100, y: this.map.heightInPixels / 2 };
@@ -635,6 +944,7 @@ export default class BaseLevelScene extends Phaser.Scene {
     this.levelFinished = true;
     this.scene.stop('UIScene');
     this.cameras.main.fadeOut(350, 0, 0, 0);
+    getAudio(this)?.playSfx('levelup');
     this.time.delayedCall(360, callback);
   }
 
@@ -644,6 +954,7 @@ export default class BaseLevelScene extends Phaser.Scene {
     const run = getRun(this);
     this.scene.stop('UIScene');
     this.cameras.main.fadeOut(350, 80, 0, 0);
+    getAudio(this)?.playSfx('death');
     this.time.delayedCall(360, () => this.scene.start('GameOverScene', { run }));
   }
 

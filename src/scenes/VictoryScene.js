@@ -1,5 +1,6 @@
 import { getRun, resetRun } from '../core/runState.js';
 import { addButton, addPanel } from '../core/ui.js';
+import { getAudio } from '../core/audio.js';
 
 export default class VictoryScene extends Phaser.Scene {
   constructor() {
@@ -8,10 +9,13 @@ export default class VictoryScene extends Phaser.Scene {
 
   create() {
     const run = getRun(this);
+    const audio = getAudio(this);
+    audio?.stopAllFoley();
+    audio?.stopMusic();
     this.cameras.main.setBackgroundColor('#191107');
     addPanel(this, 480, 270, 720, 400, 0x21160f, 0.94);
 
-    this.add.text(480, 105, 'VICTORIA DEL MVP', {
+    this.add.text(480, 105, 'VICTORIA', {
       fontFamily: 'Arial Black, Arial, sans-serif',
       fontSize: '44px',
       color: '#ffd27f',
@@ -21,7 +25,7 @@ export default class VictoryScene extends Phaser.Scene {
 
     const skills = run.skills.length > 0 ? run.skills.join(', ') : 'Ninguna';
     this.add.text(480, 215,
-      `Completaste los 2 niveles implementados.\n\nScore: ${run.score}\nMonedas restantes: ${run.coins}\nHP final: ${run.hp}/${run.hpMax}\nHabilidades: ${skills}`,
+      `Derrotaste al Rey Escorpión y completaste los 10 niveles de The Monster Hunter.\n\nScore: ${run.score}\nMonedas restantes: ${run.coins}\nHP final: ${run.hp}/${run.hpMax}\nHabilidades: ${skills}`,
       {
         fontFamily: 'Arial, sans-serif',
         fontSize: '20px',

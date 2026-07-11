@@ -32,7 +32,7 @@ export function addButton(scene, x, y, label, onClick, options = {}) {
   return { bg, text, setLabel: (nextLabel) => text.setText(nextLabel) };
 }
 
-export function addKeyboardHint(scene, text = 'WASD/Flechas: mover · Click/ESPACIO: disparar · ESC: menú') {
+export function addKeyboardHint(scene, text = 'WASD/Flechas: mover · Click/ESPACIO: disparar · SHIFT: salto/dash · ESC: menú') {
   return scene.add.text(16, scene.scale.height - 28, text, {
     fontFamily: 'Arial, sans-serif',
     fontSize: '14px',

@@ -1,6 +1,7 @@
 import { ABILITIES } from '../core/config.js';
 import { addSkill, getRun } from '../core/runState.js';
 import { addButton, addPanel } from '../core/ui.js';
+import { getAudio } from '../core/audio.js';
 
 export default class AbilityScene extends Phaser.Scene {
   constructor() {
@@ -57,6 +58,7 @@ export default class AbilityScene extends Phaser.Scene {
       }).setOrigin(0, 0.5);
       addButton(this, 695, y, 'Elegir', () => {
         addSkill(this, ability.id);
+        getAudio(this)?.playSfx('ability');
         this.goNext();
       }, { width: 110, height: 40, fontSize: '15px' });
     });

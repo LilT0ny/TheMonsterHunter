@@ -1,5 +1,6 @@
 import { resetRun } from '../core/runState.js';
 import { addButton, addPanel } from '../core/ui.js';
+import { getAudio } from '../core/audio.js';
 
 export default class GameOverScene extends Phaser.Scene {
   constructor() {
@@ -8,6 +9,9 @@ export default class GameOverScene extends Phaser.Scene {
 
   create(data) {
     const run = data.run || { score: 0, coins: 0, skills: [] };
+    const audio = getAudio(this);
+    audio?.stopAllFoley();
+    audio?.startMusic('gameover');
     this.cameras.main.setBackgroundColor('#180806');
     addPanel(this, 480, 270, 680, 390, 0x210c08, 0.95);
 

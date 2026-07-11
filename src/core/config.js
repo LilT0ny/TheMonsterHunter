@@ -90,6 +90,13 @@ export const UPGRADES = [
 export const ENEMY_SCORE = {
   spider: 10,
   scorpion: 18,
+  scorpion_elite: 40,
   mummy: 22,
-  serpent: 26
+  serpent: 26,
+  mummy_giant: 45,
+  boss_golem: 200,
+  golem_fragment: 60,
+  sand_spirit: 35,
+  guardian: 55,
+  boss_king_scorpion: 300
 };
