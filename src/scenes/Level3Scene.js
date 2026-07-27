@@ -26,12 +26,6 @@ export default class Level3Scene extends BaseLevelScene {
   }
 
   checkLevelCompletion() {
-    // A mitad de las ruinas ofrecemos sumar al Jugador 2. Se pregunta una sola
-    // vez por partida: promptCoopJoin se auto-bloquea despues de la primera.
-    if (this.requiredKills > 0 && this.enemyKills >= Math.ceil(this.requiredKills / 2)) {
-      this.promptCoopJoin('Vas por la mitad de las ruinas. ¿Necesitás ayuda?');
-    }
-
     if (this.enemyKills >= this.requiredKills && !this.portal) {
       addScore(this, 70);
       this.showObjective('Ruinas despejadas. Entra al portal para elegir habilidad y visitar la tienda.');

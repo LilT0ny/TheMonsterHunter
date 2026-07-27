@@ -39,6 +39,7 @@ py -m http.server 8080
 
 ### Generales
 
+- **F**: activa o desactiva el **autodisparo**. Con él encendido el arco apunta solo al enemigo más cercano dentro de 430 px y dispara sin que toques nada. La preferencia queda guardada en el perfil y el HUD muestra un distintivo `AUTO` mientras está activo.
 - **ESC** o **P**: pausa. Desde el menú de pausa se reanuda, se reinicia el nivel o se vuelve al menú principal.
 - **Botón PAUSA** en la esquina superior derecha del HUD: lo mismo, con el mouse.
 - **Último en pie**: cuando queda un solo jugador activo — porque juegas solo, o porque tu compañero cayó — ese jugador responde a **los dos esquemas de teclas** (WASD *y* flechas, ESPACIO *y* ENTER, SHIFT *y* CTRL) y al mouse. Si no, al caer J1 el sobreviviente se quedaba sin WASD y parecía que el juego había dejado de responder.
@@ -74,7 +75,7 @@ El HUD muestra las tres estrellas en vivo, así que en todo momento sabes cuále
 
 ## Co-op de 2 jugadores
 
-- El **Nivel 3**, al llegar a la mitad de los enemigos eliminados, pregunta *"¿Necesitás ayuda?"* y permite que entre un segundo jugador **en caliente**, sin reiniciar el nivel.
+- El compañero se ofrece **al morir**, en la pantalla de Game Over: el botón *"Reintentar con un compañero (2 jugadores)"* arranca la nueva partida con los dos arqueros desde el Nivel 1. Es el momento en que la ayuda realmente hace falta.
 - Los dos comparten score, monedas, habilidades y mejoras: la run es una sola. Lo que **no** comparten es la vida — cada uno tiene su barra.
 - La cámara sigue el punto medio entre ambos y se abre (zoom hasta 0.64) cuando se separan, para que ninguno quede fuera de cuadro. La apertura se mide **solo entre jugadores en pie**: si uno cae, la cámara vuelve a zoom 1 y sigue directamente al que queda, en vez de estirarse hasta un cuerpo que ya no se mueve.
 - Los enemigos y los dos jefes apuntan al **jugador vivo más cercano**, no siempre a J1.
@@ -94,6 +95,23 @@ El juego no usa ningún archivo de audio — **todo el sonido es procedural**, s
 - Los navegadores bloquean el audio hasta el primer click/tecla — el `AudioContext` se resume automáticamente al primer gesto en `MenuScene`.
 - Hay un botón de mute persistente (`localStorage`) en el menú, y un punto de color en el HUD durante el juego (verde = sonido activo, rojo = mute).
 
+## Curva de dificultad
+
+A medida que avanzás acumulás habilidades y mejoras, así que matar deja de costar. Por eso la presión **no** viene del aguante de cada enemigo sino de cuántos hay (`DIFFICULTY` en `config.js`):
+
+- **Cantidad**: cada nivel suma refuerzos proporcionales a los enemigos que él mismo define, más un extra fijo, con techo de 10 para que la pantalla siga siendo legible. Nivel 1 no suma nada; el Nivel 9 llega a ~22 enemigos.
+- **Vida**: sube apenas un 8% por nivel. No queremos esponjas de daño, queremos multitud. **Los jefes quedan afuera** de este escalado: ya tienen fases diseñadas y multiplicar su HP solo alargaría la pelea.
+- Los refuerzos también suben `requiredKills`: si no, el portal se abriría sin haber tocado a ninguno.
+- Cada nivel tiene su propia fauna de refuerzos en `REINFORCEMENT_POOLS` — nada de serpientes voladoras en el desierto inicial.
+
+## Arenas de jefe
+
+Los jefes ya no pelean solos (`BOSS_ARENA_WAVES` en `config.js`):
+
+- **Boss 5**: arranca con 4 escorpiones y arañas, y llega una oleada de 3 cada 12 s, con techo de 10 vivos.
+- **Boss 10**: arranca con 5 escorpiones y serpientes, oleada de 4 cada 10 s, techo de 14 — además de los refuerzos que el propio Rey invoca en su fase 2.
+- El oleaje **se corta al caer el jefe**. Sin eso la arena nunca se vaciaría y la tercera estrella ("no dejar ningún enemigo vivo") sería imposible de conseguir.
+
 ## Arma y proyectiles
 
 - El **arco es un sprite propio** (`bow` / `bow2`) que orbita al jugador y rota hacia donde apunta. Antes estaba pintado sobre el cuerpo del arquero, y un arma pintada sobre el cuerpo no puede apuntar a ningún lado.
@@ -101,6 +119,15 @@ El juego no usa ningún archivo de audio — **todo el sonido es procedural**, s
 - Cada disparo produce un **fogonazo** en la punta del arco, y cada flecha deja una **estela** que se desvanece, para que el tiro se lea en pantalla incluso a 500 px/s.
 - Las flechas **se clavan en los muros** (`walls`) y sueltan una chispa breve. Siguen pasando por encima de los muros bajos (`lowwalls`), que es la mecánica del Nivel 3.
 - La **moneda** es un disco con canto, anillo interior y rombo en relieve. Antes era un cuadrado plano de 15×15.
+- Hay **una flecha por elemento** — `arrow`, `arrowFire`, `arrowIce`, `arrowElectric` — con su propio resplandor en la punta y su estela tintada. Si tenés varias habilidades manda la más vistosa (rayo > fuego > hielo), en vez de mezclar colores y que no se lea ninguna.
+
+## Animación y arte
+
+- El **arquero está animado**: `PreloadScene` genera una hoja de 5 fotogramas de 32×32 (uno quieto y un ciclo de caminata de 4) y registra los recortes a mano, porque `generateTexture` deja un único frame con la hoja entera. Las piernas alternan y el cuerpo sube un píxel en los pasos, que es lo que vende el movimiento.
+- El mismo dibujo genera a J1 y a J2 con paletas distintas: un solo arte que mantener, no dos.
+- Todos los **enemigos** se redibujaron con volumen: sombra en el suelo, luz y sombra propias, y detalles que antes no existían — patas articuladas en la araña, cola segmentada y placas en el escorpión, vendas con relieve en la momia, escamas y membrana alar en la serpiente, grietas encendidas y musgo en el Coloso, remaches y visor en el Guardián, corona de púas en el Rey Escorpión.
+- Los **proyectiles enemigos** dejaron de ser cuadrados: `enemyBolt` es una descarga con núcleo claro y púas, `venom` una gota con brillo y goteo.
+- Los **efectos elementales** tienen textura propia: `flame` (quemadura), `frost` (congelamiento) y `spark` (electricidad). La quemadura suelta tres llamitas por tic, el hielo estalla en cristales, y el rayo encadenado dibuja un **trazo quebrado** en vez de la línea recta que tenía antes.
 
 ## Qué incluye
 
@@ -111,7 +138,7 @@ El juego no usa ningún archivo de audio — **todo el sonido es procedural**, s
 - `AbilityScene`: elección de 1 de 3 habilidades aleatorias.
 - `TiendaScene`: mejoras de salud, suerte, armadura, velocidad y daño. Al continuar cura y levanta a **todo el equipo**.
 - `Level2Scene`: dunas errantes, escorpiones centinela, un escorpión de élite y 3 **limos verdes** que se parten en dos cada 7 s si los dejas vivos (hasta 2 generaciones: 1 → 2 → 4). Dejarlos vivos no te castiga con daño, te castiga con cantidad.
-- `Level3Scene`: ruinas del oasis, muros bajos que solo se cruzan con el dash, una momia gigante, y la **oferta de co-op** a mitad del nivel.
+- `Level3Scene`: ruinas del oasis, muros bajos que solo se cruzan con el dash y una momia gigante.
 - `Level4Scene`: tormenta de arena, 3 oleadas seguidas sin pausa y viñeta de visibilidad reducida.
 - `Boss5Scene`: El Coloso de Piedra. Fase 1 (aproxima → telegrafía en rojo → aplasta en área → retrocede) hasta el 50% de HP; fase 2 lo fragmenta en 3 `golem_fragment` + 2 `sand_spirit` (solo dañables con flecha eléctrica o explosiva). El aplastamiento es daño en área y alcanza a los dos jugadores. Recompensa: 80 monedas + 2 elecciones de habilidad seguidas.
 - `Level6Scene`: catacumbas ardientes, lava con daño cada 500 ms, plataformas móviles y oleadas cronometradas.
@@ -120,7 +147,7 @@ El juego no usa ningún archivo de audio — **todo el sonido es procedural**, s
 - `Level9Scene`: el corazón del desierto, combina todo el bestiario + zonas de trampa + una oleada final mezclada antes del portal.
 - `Boss10Scene`: El Rey Escorpión. Fase 1: golpe de cola telegrafiado en arco (cada jugador se evalúa por separado, así uno puede esquivar aunque el otro coma el golpe). Fase 2 (HP < 66%): invoca 3 `scorpion` cada 15 s. Fase 3 (HP < 33%): furia (velocidad ×2, daño ×1.5) + ventanas de invulnerabilidad de 2 s cada 10 s.
 - `UIScene`: HUD con score, monedas, habilidades, daño, **barra de progreso de enemigos**, **3 estrellas en vivo**, una **barra de vida por jugador**, botón de pausa y mute.
-- `GameOverScene`: cierra la run y recuerda que las estrellas quedan a salvo.
+- `GameOverScene`: cierra la run, recuerda que las estrellas quedan a salvo y ofrece **reintentar con un compañero local**.
 - `VictoryScene`: resumen final tras derrotar al Rey Escorpión.
 
 ## Ayudas al jugador

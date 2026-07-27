@@ -108,6 +108,16 @@ export default class UIScene extends Phaser.Scene {
     this.pauseButton.on('pointerout', () => this.pauseButton.setFillStyle(0x6b3f1d, 0.95));
     this.pauseButton.on('pointerdown', requestPause);
 
+    // Indicador de autodisparo: sin esto el jugador no sabe si la F quedo
+    // activada, y el arco apuntando solo se siente como un bug.
+    this.autoFireBadge = this.add.text(800, 27, 'AUTO', {
+      fontFamily: 'Arial Black, Arial, sans-serif',
+      fontSize: '11px',
+      color: '#0e2a12',
+      backgroundColor: '#63c46a',
+      padding: { left: 5, right: 5, top: 3, bottom: 3 }
+    }).setOrigin(0.5).setDepth(1004).setVisible(false);
+
     this.muteDot = this.add.circle(920, 27, 7, 0x63c46a)
       .setDepth(1003)
       .setInteractive({ useHandCursor: true });
@@ -127,6 +137,7 @@ export default class UIScene extends Phaser.Scene {
     this.text.setText(`${this.levelName}  |  Score: ${run.score}  |  Monedas: ${run.coins}`);
     this.statsText.setText(`Habilidades: ${run.skills.length}  ·  Daño: ${stats.arrowDamage}`);
 
+    this.autoFireBadge.setVisible(Boolean(level?.autoFire));
     this.updateProgress(level);
     this.updateStars(level, run);
     this.updateHealthBars(run);
@@ -135,21 +146,32 @@ export default class UIScene extends Phaser.Scene {
   updateProgress(level) {
     const kills = level?.enemyKills ?? 0;
     const required = level?.requiredKills ?? 0;
+    const spawned = level?.totalEnemiesSpawned ?? 0;
 
-    if (required <= 0) {
-      this.progressText.setText('Enemigos:');
+    // Los niveles por oleadas (4, 9) y los de jefe no fijan requiredKills: su
+    // final depende de listas de enemigos concretas. Ahi el avance se mide
+    // contra los enemigos que fueron apareciendo, asi la barra nunca queda
+    // muda. Si llega una oleada nueva la barra retrocede, que es justamente
+    // la informacion que el jugador necesita.
+    const goal = required > 0 ? required : spawned;
+
+    if (goal <= 0) {
+      this.progressText.setText('—');
       this.progressBar.displayWidth = 0;
       return;
     }
 
-    const done = Math.min(kills, required);
-    this.progressText.setText(`${done}/${required}`);
-    this.progressBar.displayWidth = 150 * (done / required);
-    this.progressBar.setFillStyle(done >= required ? 0x63c46a : 0xf1c27d);
+    const done = Math.min(kills, goal);
+    this.progressText.setText(`${done}/${goal}`);
+    this.progressBar.displayWidth = 150 * (done / goal);
+    this.progressBar.setFillStyle(done >= goal ? 0x63c46a : 0xf1c27d);
   }
 
   updateStars(level, run) {
-    const cleared = (level?.requiredKills ?? 0) > 0 && (level?.enemyKills ?? 0) >= level.requiredKills;
+    // "Nivel superado" se mide por la aparicion del portal y no por requiredKills:
+    // hay niveles que terminan por oleadas o por matar al jefe, y ahi el contador
+    // de bajas nunca alcanzaria el umbral.
+    const cleared = Boolean(level?.portal);
     const healthy = getPartyHealthRatio(run) > 0.5;
     const perfect = Boolean(level?.hasClearedAllEnemies?.());
 

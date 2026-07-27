@@ -1,9 +1,14 @@
 import {
+  AUTO_FIRE_KEY,
+  AUTO_FIRE_RANGE,
+  BOSS_ARENA_WAVES,
+  DIFFICULTY,
   ENEMY_SCORE,
   GAME_WIDTH,
   HEART_HEAL_RATIO,
   MAX_PLAYERS,
   PLAYER_PROFILES,
+  REINFORCEMENT_POOLS,
   REVIVE_DURATION,
   REVIVE_RADIUS
 } from '../core/config.js';
@@ -21,8 +26,8 @@ import {
   revivePlayer,
   setLevel
 } from '../core/runState.js';
-import { recordLevelResult } from '../core/profile.js';
-import { addButton, addKeyboardHint } from '../core/ui.js';
+import { isAutoFireEnabled, recordLevelResult, setAutoFire } from '../core/profile.js';
+import { addKeyboardHint } from '../core/ui.js';
 import { getAudio } from '../core/audio.js';
 
 const ELITE_VISUALS = {
@@ -39,7 +44,6 @@ export default class BaseLevelScene extends Phaser.Scene {
     this.enemyKills = 0;
     this.totalEnemiesSpawned = 0;
     this.players = [];
-    this.coopPromptShown = false;
   }
 
   createLevel({
@@ -54,7 +58,6 @@ export default class BaseLevelScene extends Phaser.Scene {
     this.levelFinished = false;
     this.enemyKills = 0;
     this.totalEnemiesSpawned = 0;
-    this.coopPromptShown = false;
     this.levelTitle = title;
     this.levelNumber = levelNumber;
     setLevel(this, levelNumber);
@@ -76,6 +79,10 @@ export default class BaseLevelScene extends Phaser.Scene {
       levelSceneKey: this.scene.key,
       levelNumber
     });
+
+    // El evento 'create' se dispara cuando el create() del nivel concreto ya
+    // termino. Recien ahi sabemos cuantos enemigos puso y podemos reforzar.
+    this.events.once(Phaser.Scenes.Events.CREATE, () => this.spawnDifficultyReinforcements());
 
     const audio = getAudio(this);
     audio?.startMusic(musicMood);
@@ -147,7 +154,9 @@ export default class BaseLevelScene extends Phaser.Scene {
 
   createPlayer(index, x, y) {
     const profile = PLAYER_PROFILES[index];
-    const player = this.physics.add.sprite(x, y, profile.texture).setDepth(20);
+    // Frame 0 explicito: la textura del arquero es una hoja de 5 fotogramas y,
+    // sin indicar cual, Phaser mostraria la hoja entera.
+    const player = this.physics.add.sprite(x, y, profile.texture, 0).setDepth(20);
 
     // El alta en el grupo va ANTES de configurar el cuerpo: al agregar un hijo,
     // el grupo de fisicas reaplica sus defaults sobre el body.
@@ -172,6 +181,8 @@ export default class BaseLevelScene extends Phaser.Scene {
       curseFactor: 0.55,
       reviveProgress: 0
     });
+
+    player.play(`${profile.texture}-idle`);
 
     // Etiqueta J1/J2 solo cuando hay dos: en solitario seria ruido visual.
     const tag = this.add.text(x, y - 26, profile.label, {
@@ -223,69 +234,6 @@ export default class BaseLevelScene extends Phaser.Scene {
   refreshPlayerTags() {
     const showTags = this.players.length > 1;
     this.players.forEach((player) => player.getData('tag')?.setVisible(showTags));
-  }
-
-  /**
-   * Ofrece sumar un segundo jugador. Congela la fisica mientras se decide para
-   * que nadie coma dano leyendo el cartel, pero mantiene la escena viva porque
-   * los botones necesitan recibir el puntero.
-   */
-  promptCoopJoin(message = '¿Necesitas ayuda? Puede entrar un segundo jugador.') {
-    const run = getRun(this);
-    if (this.coopPromptShown || run.coop || run.players.length >= MAX_PLAYERS) return false;
-
-    this.coopPromptShown = true;
-    this.overlayActive = true;
-    this.physics.pause();
-    getAudio(this)?.playSfx('pause');
-
-    const created = [];
-    const track = (...items) => { created.push(...items); return items[0]; };
-
-    track(this.add.rectangle(480, 270, 960, 540, 0x000000, 0.55).setScrollFactor(0).setDepth(1290));
-    track(this.add.rectangle(480, 270, 640, 250, 0x21160f, 0.97)
-      .setScrollFactor(0).setDepth(1300).setStrokeStyle(2, 0xf1c27d, 1));
-
-    track(this.add.text(480, 192, message, {
-      fontFamily: 'Arial Black, Arial, sans-serif',
-      fontSize: '22px',
-      color: '#ffd27f',
-      align: 'center',
-      wordWrap: { width: 560 }
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(1301));
-
-    track(this.add.text(480, 248, `${PLAYER_PROFILES[1].hint}\nComparten score, monedas y mejoras. Si uno cae, el otro lo reanima.`, {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '15px',
-      color: '#fff7df',
-      align: 'center',
-      lineSpacing: 5
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(1301));
-
-    const close = () => {
-      created.forEach((item) => item.destroy());
-      this.overlayActive = false;
-      this.physics.resume();
-      getAudio(this)?.playSfx('unpause');
-    };
-
-    const yes = addButton(this, 360, 330, 'Sí, que entre J2', () => {
-      close();
-      this.joinPlayerTwo();
-    }, { width: 220, height: 44, fontSize: '16px' });
-
-    const no = addButton(this, 600, 330, 'No, puedo solo', () => {
-      close();
-      this.showObjective('Seguís en solitario. Suerte ahí afuera.', { delay: 2200 });
-    }, { width: 220, height: 44, fontSize: '16px' });
-
-    [yes, no].forEach(({ bg, text }) => {
-      bg.setScrollFactor(0).setDepth(1302);
-      text.setScrollFactor(0).setDepth(1303);
-      track(bg, text);
-    });
-
-    return true;
   }
 
   /** Primer punto transitable en anillos crecientes alrededor de (x, y). */
@@ -437,7 +385,8 @@ export default class BaseLevelScene extends Phaser.Scene {
   // --- Entrada ----------------------------------------------------------
 
   createInputs() {
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE,ESC,SHIFT,P');
+    this.keys = this.input.keyboard.addKeys(`W,A,S,D,SPACE,ESC,SHIFT,P,${AUTO_FIRE_KEY}`);
+    this.autoFire = isAutoFireEnabled(this);
 
     this.playerKeys = PLAYER_PROFILES.map((profile, index) => {
       const map = this.input.keyboard.addKeys(Object.values(profile.keys).join(','));
@@ -471,6 +420,21 @@ export default class BaseLevelScene extends Phaser.Scene {
     // pausa, para no perder una partida por apretar ESC sin querer.
     this.keys.ESC.on('down', () => this.pauseLevel());
     this.keys.P.on('down', () => this.pauseLevel());
+    this.keys[AUTO_FIRE_KEY].on('down', () => this.toggleAutoFire());
+  }
+
+  /** El autodisparo se recuerda entre partidas: es preferencia, no estado. */
+  toggleAutoFire() {
+    if (this.levelFinished || this.overlayActive) return;
+    this.autoFire = !this.autoFire;
+    setAutoFire(this, this.autoFire);
+    getAudio(this)?.playSfx('uiSelect');
+    this.showObjective(
+      this.autoFire
+        ? `Autodisparo ACTIVADO — apunta solo al enemigo más cercano. ${AUTO_FIRE_KEY} para apagarlo.`
+        : `Autodisparo apagado. ${AUTO_FIRE_KEY} para volver a encenderlo.`,
+      { delay: 1800 }
+    );
   }
 
   pauseLevel() {
@@ -563,10 +527,13 @@ export default class BaseLevelScene extends Phaser.Scene {
     if (this.isActionPressed(index, 'up', lastOneStanding)) vy -= 1;
     if (this.isActionPressed(index, 'down', lastOneStanding)) vy += 1;
 
+    const texture = PLAYER_PROFILES[index].texture;
+
     if (vx !== 0 || vy !== 0) {
       const vector = new Phaser.Math.Vector2(vx, vy).normalize().scale(speed);
       player.setVelocity(vector.x, vector.y);
       player.setData('moveAngle', Math.atan2(vector.y, vector.x));
+      player.play(`${texture}-walk`, true);
 
       if (time > (player.getData('nextFootstepAt') || 0)) {
         player.setData('nextFootstepAt', time + 300);
@@ -574,12 +541,25 @@ export default class BaseLevelScene extends Phaser.Scene {
       }
     } else {
       player.setVelocity(0, 0);
+      player.play(`${texture}-idle`, true);
     }
   }
 
   updatePlayerAim(player) {
     const index = this.getPlayerIndex(player);
     const profile = PLAYER_PROFILES[index];
+
+    // Autodisparo: la punteria pasa a ser automatica sobre el enemigo mas
+    // cercano dentro del radio. Si no hay ninguno, se vuelve al apuntado manual.
+    if (this.autoFire) {
+      const target = this.findNearestEnemy(player.x, player.y, AUTO_FIRE_RANGE);
+      if (target) {
+        player.setData('aimAngle', Phaser.Math.Angle.Between(player.x, player.y, target.x, target.y));
+        player.setData('autoTarget', true);
+        return;
+      }
+      player.setData('autoTarget', false);
+    }
 
     // J1 apunta con el mouse en cuanto lo mueve; hasta entonces (y siempre para
     // J2) apunta hacia donde se esta desplazando.
@@ -598,6 +578,11 @@ export default class BaseLevelScene extends Phaser.Scene {
   updatePlayerActions(player, lastOneStanding) {
     const index = this.getPlayerIndex(player);
     const profile = PLAYER_PROFILES[index];
+
+    // Con autodisparo activo y un blanco a tiro, se dispara solo.
+    if (this.autoFire && player.getData('autoTarget')) {
+      this.tryShoot(player);
+    }
 
     // El mouse siempre dispara por el jugador 1, salvo que J1 este caido: ahi
     // pasa a manejar al que quede en pie.
@@ -801,6 +786,71 @@ export default class BaseLevelScene extends Phaser.Scene {
     this.disableSprite(arrow);
   }
 
+  /**
+   * Que elemento manda visualmente. El rayo pisa al fuego y el fuego al hielo:
+   * si tenes varias habilidades, la flecha muestra la mas vistosa en vez de
+   * mezclar colores y no leerse ninguna.
+   */
+  elementFor(skills) {
+    if (skills.includes('electric')) return { texture: 'arrowElectric', tint: 0x9fd8ff, burst: 'spark' };
+    if (skills.includes('fire')) return { texture: 'arrowFire', tint: 0xff8a3a, burst: 'flame' };
+    if (skills.includes('ice')) return { texture: 'arrowIce', tint: 0x8fe6ff, burst: 'frost' };
+    return { texture: 'arrow', tint: 0xffe08a, burst: null };
+  }
+
+  /** Particula suelta que sube y se apaga. Base de todos los efectos. */
+  spawnElementalPuff(texture, x, y, options = {}) {
+    const {
+      rise = 16, duration = 420, scale = 1, tint = null, spin = 0, drift = 0
+    } = options;
+
+    const puff = this.add.image(x, y, texture).setDepth(28).setScale(scale * 0.65);
+    if (tint !== null) puff.setTint(tint);
+
+    this.tweens.add({
+      targets: puff,
+      x: x + drift,
+      y: y - rise,
+      scale: scale * 1.1,
+      angle: spin,
+      alpha: 0,
+      duration,
+      onComplete: () => puff.destroy()
+    });
+
+    return puff;
+  }
+
+  /** Rayo quebrado entre dos puntos, en vez de una linea recta. */
+  drawLightning(x1, y1, x2, y2) {
+    const segments = 6;
+    const points = [];
+    for (let i = 0; i <= segments; i += 1) {
+      const t = i / segments;
+      const jitter = i === 0 || i === segments ? 0 : Phaser.Math.Between(-9, 9);
+      const nx = -(y2 - y1);
+      const ny = x2 - x1;
+      const length = Math.hypot(nx, ny) || 1;
+      points.push(new Phaser.Math.Vector2(
+        Phaser.Math.Linear(x1, x2, t) + (nx / length) * jitter,
+        Phaser.Math.Linear(y1, y2, t) + (ny / length) * jitter
+      ));
+    }
+
+    const bolt = this.add.graphics().setDepth(30);
+    bolt.lineStyle(5, 0x5a86ff, 0.45);
+    bolt.strokePoints(points);
+    bolt.lineStyle(2, 0xeaf4ff, 0.95);
+    bolt.strokePoints(points);
+
+    this.tweens.add({
+      targets: bolt,
+      alpha: 0,
+      duration: 220,
+      onComplete: () => bolt.destroy()
+    });
+  }
+
   spawnMuzzleFlash(player, angle) {
     const flash = this.add.image(
       player.x + Math.cos(angle) * 24,
@@ -820,11 +870,15 @@ export default class BaseLevelScene extends Phaser.Scene {
   spawnArrow(player, angle) {
     const run = getRun(this);
     const stats = getDerivedStats(run);
+    const element = this.elementFor(run.skills);
     const originX = player.x + Math.cos(angle) * 18;
     const originY = player.y + Math.sin(angle) * 18;
-    const arrow = this.arrows.get(originX, originY, 'arrow');
+    const arrow = this.arrows.get(originX, originY, element.texture);
     if (!arrow) return;
 
+    // El grupo recicla flechas: hay que reasignar la textura, si no se reusa la
+    // del elemento anterior.
+    arrow.setTexture(element.texture);
     arrow.setActive(true).setVisible(true).setDepth(18).setAlpha(1);
     arrow.body.enable = true;
     arrow.body.setAllowGravity(false);
@@ -837,7 +891,9 @@ export default class BaseLevelScene extends Phaser.Scene {
       damage: stats.arrowDamage,
       returned: false,
       hits: 0,
-      nextTrailAt: 0
+      nextTrailAt: 0,
+      trailTint: element.tint,
+      burst: element.burst
     });
     this.physics.velocityFromRotation(angle, 500, arrow.body.velocity);
   }
@@ -860,7 +916,9 @@ export default class BaseLevelScene extends Phaser.Scene {
       // Estela: hace que el disparo se lea en pantalla incluso a alta velocidad.
       if (time > (arrow.getData('nextTrailAt') || 0)) {
         arrow.setData('nextTrailAt', time + 32);
-        const trail = this.add.image(arrow.x, arrow.y, 'arrowTrail').setDepth(17);
+        const trail = this.add.image(arrow.x, arrow.y, 'arrowTrail')
+          .setDepth(17)
+          .setTint(arrow.getData('trailTint') || 0xffe08a);
         this.tweens.add({
           targets: trail,
           alpha: 0,
@@ -1059,7 +1117,18 @@ export default class BaseLevelScene extends Phaser.Scene {
 
     const canSlow = !vulnerableSkills || vulnerableSkills.includes('ice');
     if (canSlow && run.skills.includes('ice')) {
-      enemy.setData('slowUntil', this.time.now + 2000);
+      this.applyFrost(enemy);
+    }
+
+    // Estallido del elemento en el punto de impacto.
+    const burst = arrow.getData('burst');
+    if (burst && burst !== 'frost') {
+      this.spawnElementalPuff(burst, arrow.x, arrow.y, {
+        rise: burst === 'flame' ? 18 : 4,
+        duration: 320,
+        scale: 1.05,
+        spin: burst === 'spark' ? 120 : 0
+      });
     }
 
     if (run.skills.includes('explosive')) {
@@ -1135,12 +1204,44 @@ export default class BaseLevelScene extends Phaser.Scene {
   applyBurn(enemy, ticks, tickDamage) {
     for (let i = 1; i <= ticks; i += 1) {
       this.time.delayedCall(i * 1000, () => {
-        if (enemy.active) {
-          enemy.setTint(0xff5d2a);
-          this.damageEnemy(enemy, tickDamage);
-          this.time.delayedCall(90, () => enemy.active && this.resetEnemyTint(enemy));
+        if (!enemy.active) return;
+        enemy.setTint(0xff5d2a);
+        this.damageEnemy(enemy, tickDamage);
+
+        // Tres llamitas por tic: la quemadura se VE arder, no es solo un tinte.
+        for (let f = 0; f < 3; f += 1) {
+          this.spawnElementalPuff('flame',
+            enemy.x + Phaser.Math.Between(-9, 9),
+            enemy.y + Phaser.Math.Between(-4, 6), {
+              rise: Phaser.Math.Between(16, 26),
+              duration: Phaser.Math.Between(380, 560),
+              scale: Phaser.Math.FloatBetween(0.7, 1.1),
+              drift: Phaser.Math.Between(-6, 6)
+            });
         }
+
+        this.time.delayedCall(90, () => enemy.active && this.resetEnemyTint(enemy));
       });
+    }
+  }
+
+  /** Escarcha al congelar: estallido de cristales y destello azul. */
+  applyFrost(enemy) {
+    enemy.setData('slowUntil', this.time.now + 2000);
+    enemy.setTint(0x8fe6ff);
+    this.time.delayedCall(260, () => enemy.active && this.resetEnemyTint(enemy));
+
+    for (let i = 0; i < 4; i += 1) {
+      const angle = (Math.PI * 2 * i) / 4 + Phaser.Math.FloatBetween(-0.3, 0.3);
+      this.spawnElementalPuff('frost',
+        enemy.x + Math.cos(angle) * 8,
+        enemy.y + Math.sin(angle) * 8, {
+          rise: 6,
+          drift: Math.cos(angle) * 14,
+          duration: 520,
+          spin: Phaser.Math.Between(-140, 140),
+          scale: Phaser.Math.FloatBetween(0.6, 1)
+        });
     }
   }
 
@@ -1172,10 +1273,10 @@ export default class BaseLevelScene extends Phaser.Scene {
 
     chained.forEach(({ enemy }) => {
       if (!this.canDamageEnemy(enemy, originEnemy.x, originEnemy.y)) return;
-      const line = this.add.line(0, 0, originEnemy.x, originEnemy.y, enemy.x, enemy.y, 0x9fe8ff, 0.9)
-        .setOrigin(0, 0)
-        .setDepth(30);
-      this.tweens.add({ targets: line, alpha: 0, duration: 160, onComplete: () => line.destroy() });
+      this.drawLightning(originEnemy.x, originEnemy.y, enemy.x, enemy.y);
+      this.spawnElementalPuff('spark', enemy.x, enemy.y, {
+        rise: 4, duration: 280, scale: 1.1, spin: 90
+      });
       this.damageEnemy(enemy, damage);
     });
   }
@@ -1411,7 +1512,14 @@ export default class BaseLevelScene extends Phaser.Scene {
       .setCollideWorldBounds(true);
     enemy.body.setAllowGravity(false);
 
-    const merged = { ...data, ...extraData };
+    // La vida sube apenas con el nivel, y nunca para los jefes: ellos ya tienen
+    // fases diseñadas y multiplicar su HP solo alargaria la pelea.
+    const scaled = { ...data };
+    if (!type.startsWith('boss_')) {
+      scaled.hp = Math.round(scaled.hp * DIFFICULTY.hpMultiplier(this.levelNumber || 1));
+    }
+
+    const merged = { ...scaled, ...extraData };
     enemy.setData({
       type,
       ...merged,
@@ -1444,6 +1552,82 @@ export default class BaseLevelScene extends Phaser.Scene {
 
     this.totalEnemiesSpawned += 1;
     return enemy;
+  }
+
+  /**
+   * Refuerzos por dificultad. Corre DESPUES del create() del nivel, cuando ya
+   * se sabe cuantos enemigos puso por su cuenta, y suma una proporcion sobre
+   * ese numero. Tambien sube requiredKills: si no, el portal se abriria sin
+   * haber tocado a los refuerzos.
+   *
+   * Los niveles de jefe se saltean: tienen su propio oleaje de arena.
+   */
+  spawnDifficultyReinforcements() {
+    if (this.levelFinished || BOSS_ARENA_WAVES[this.levelNumber]) return 0;
+
+    const pool = REINFORCEMENT_POOLS[this.levelNumber];
+    if (!pool || pool.length === 0) return 0;
+
+    const extra = Math.min(
+      DIFFICULTY.maxExtraEnemies,
+      Math.round(this.totalEnemiesSpawned * DIFFICULTY.extraEnemyRatio(this.levelNumber))
+        + DIFFICULTY.extraEnemyFlat(this.levelNumber)
+    );
+    if (extra <= 0) return 0;
+
+    const points = this.getRandomSafePoints(extra, {
+      margin: 150,
+      minDistanceFromPlayer: 300,
+      minDistanceBetween: 80
+    });
+
+    points.forEach((point, i) => this.spawnEnemy(pool[i % pool.length], point.x, point.y));
+
+    if (points.length > 0 && this.requiredKills > 0) {
+      this.requiredKills += points.length;
+    }
+
+    return points.length;
+  }
+
+  // --- Oleaje de los niveles de jefe -------------------------------------
+
+  /** El jefe deja de pelear solo: la arena se llena mientras siga vivo. */
+  startBossArenaWaves() {
+    const config = BOSS_ARENA_WAVES[this.levelNumber];
+    if (!config) return;
+
+    this.spawnArenaWave(config, config.initial);
+    this.arenaWaveEvent = this.time.addEvent({
+      delay: config.intervalMs,
+      loop: true,
+      callback: () => this.spawnArenaWave(config, config.waveSize)
+    });
+  }
+
+  spawnArenaWave(config, amount) {
+    if (this.levelFinished) return;
+
+    // Techo de enemigos vivos: la arena presiona, no ahoga.
+    const room = Math.min(amount, config.maxAlive - this.enemies.countActive(true));
+    if (room <= 0) return;
+
+    const points = this.getRandomSafePoints(room, {
+      margin: 140,
+      minDistanceFromPlayer: 260,
+      minDistanceBetween: 70
+    });
+
+    points.forEach((point, i) => this.spawnEnemy(config.types[i % config.types.length], point.x, point.y));
+  }
+
+  /**
+   * Se corta al caer el jefe. Sin esto la arena nunca se vaciaria y la tercera
+   * estrella ("no dejar ningun enemigo vivo") seria imposible de conseguir.
+   */
+  stopBossArenaWaves() {
+    this.arenaWaveEvent?.remove();
+    this.arenaWaveEvent = null;
   }
 
   spawnEnemiesFromMap(types = []) {

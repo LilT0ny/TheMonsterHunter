@@ -56,7 +56,8 @@ export default class Boss10Scene extends BaseLevelScene {
 
     this.portalPosition = this.findObject('portal');
     this.spawnBoss();
-    this.showObjective('Objetivo: derrota al Rey Escorpión. Su cola golpea en arco — posicionate al costado.', { backgroundColor: 'rgba(54, 12, 12, 0.8)' });
+    this.startBossArenaWaves();
+    this.showObjective('Objetivo: derrota al Rey Escorpión. Su cola golpea en arco — posicionate al costado. Su guardia no deja de llegar.', { backgroundColor: 'rgba(54, 12, 12, 0.8)' });
   }
 
   spawnBoss() {
@@ -222,6 +223,9 @@ export default class Boss10Scene extends BaseLevelScene {
     this.victoryTriggered = true;
     this.summonEvent?.remove();
     this.invulnEvent?.remove();
+    // Igual que en el Boss 5: sin esto la arena nunca se vaciaria y la tercera
+    // estrella quedaria fuera de alcance.
+    this.stopBossArenaWaves();
 
     addScore(this, 400);
     this.showObjective('¡Rey Escorpión derrotado! Entra al portal para tu victoria.', { backgroundColor: 'rgba(54, 12, 12, 0.8)' });

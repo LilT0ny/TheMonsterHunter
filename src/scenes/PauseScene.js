@@ -58,7 +58,7 @@ export default class PauseScene extends Phaser.Scene {
     const level = this.scene.get(this.levelSceneKey);
     const run = getRun(this);
 
-    const cleared = (level?.requiredKills ?? 0) > 0 && (level?.enemyKills ?? 0) >= level.requiredKills;
+    const cleared = Boolean(level?.portal);
     const healthy = getPartyHealthRatio(run) > 0.5;
     const perfect = Boolean(level?.hasClearedAllEnemies?.());
     const status = [cleared, healthy, perfect];

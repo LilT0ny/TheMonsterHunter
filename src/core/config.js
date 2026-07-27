@@ -169,3 +169,55 @@ export const REVIVE_HP_RATIO = 0.5;
 
 // Corazon de emergencia: aparece cada vez que un jugador cruza el 50% de vida.
 export const HEART_HEAL_RATIO = 0.3;
+
+// Autodisparo: se activa con la tecla F y apunta solo al enemigo mas cercano
+// dentro de este radio. La preferencia se guarda en el perfil.
+export const AUTO_FIRE_KEY = 'F';
+export const AUTO_FIRE_RANGE = 430;
+
+/**
+ * Curva de dificultad.
+ *
+ * A medida que avanzas acumulas habilidades y mejoras, asi que matar deja de
+ * costar. La presion entonces no viene del aguante de cada enemigo sino de
+ * CUANTOS hay: la vida sube apenas, la cantidad sube fuerte.
+ */
+export const DIFFICULTY = {
+  // Proporcion de enemigos extra sobre los que el nivel define por si mismo.
+  extraEnemyRatio: (level) => Math.max(0, (level - 1) * 0.14),
+  // Refuerzos fijos adicionales, para que los ultimos niveles se sientan llenos.
+  extraEnemyFlat: (level) => Math.max(0, Math.floor((level - 1) / 2)),
+  // La vida sube poco: no queremos esponjas de dano, queremos multitud.
+  hpMultiplier: (level) => 1 + Math.max(0, level - 1) * 0.08,
+  // Techo de refuerzos por nivel. Sin el, la proporcion se dispara en los
+  // ultimos niveles y la pantalla deja de leerse.
+  maxExtraEnemies: 10
+};
+
+/**
+ * De que se componen los refuerzos de cada nivel. Se respeta la fauna del
+ * tramo: nada de serpientes voladoras en el desierto inicial.
+ *
+ * Los niveles 5 y 10 no figuran a proposito: son de jefe y usan BOSS_ARENA_WAVES.
+ */
+export const REINFORCEMENT_POOLS = {
+  1: ['spider'],
+  2: ['spider', 'scorpion'],
+  3: ['mummy', 'spider'],
+  4: ['scorpion', 'spider'],
+  6: ['serpent', 'scorpion'],
+  7: ['serpent', 'mummy'],
+  8: ['scorpion', 'mummy'],
+  9: ['serpent', 'scorpion', 'mummy']
+};
+
+/**
+ * Enemigos ambientales de los niveles de jefe. El jefe deja de estar solo en
+ * la arena: hay presion constante mientras siga vivo. El spawner se corta
+ * cuando cae el jefe, para que la arena se pueda limpiar y quede la 3a estrella
+ * al alcance.
+ */
+export const BOSS_ARENA_WAVES = {
+  5: { types: ['scorpion', 'spider'], initial: 4, waveSize: 3, intervalMs: 12000, maxAlive: 10 },
+  10: { types: ['scorpion', 'serpent'], initial: 5, waveSize: 4, intervalMs: 10000, maxAlive: 14 }
+};

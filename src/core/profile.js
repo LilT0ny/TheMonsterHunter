@@ -18,7 +18,8 @@ const DEFAULT_PROFILE = Object.freeze({
   maxLevelUnlocked: 1,
   stars: {},
   bestScore: 0,
-  runsCompleted: 0
+  runsCompleted: 0,
+  autoFire: false
 });
 
 function readJson(key, fallback) {
@@ -71,7 +72,8 @@ function normalizeProfile(raw) {
     maxLevelUnlocked: Math.max(1, Math.min(TOTAL_LEVELS, Math.floor(source.maxLevelUnlocked) || 1)),
     stars,
     bestScore: Math.max(0, Math.floor(source.bestScore) || 0),
-    runsCompleted: Math.max(0, Math.floor(source.runsCompleted) || 0)
+    runsCompleted: Math.max(0, Math.floor(source.runsCompleted) || 0),
+    autoFire: Boolean(source.autoFire)
   };
 }
 
@@ -133,6 +135,17 @@ export function markRunCompleted(scene, score = 0) {
   const profile = getProfile(scene);
   profile.runsCompleted += 1;
   profile.bestScore = Math.max(profile.bestScore, score);
+  return persistProfile(scene, profile);
+}
+
+export function isAutoFireEnabled(scene) {
+  return getProfile(scene).autoFire;
+}
+
+/** El autodisparo es una preferencia del jugador, no de la partida: persiste. */
+export function setAutoFire(scene, enabled) {
+  const profile = getProfile(scene);
+  profile.autoFire = Boolean(enabled);
   return persistProfile(scene, profile);
 }
 

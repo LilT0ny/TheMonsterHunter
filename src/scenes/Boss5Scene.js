@@ -48,9 +48,10 @@ export default class Boss5Scene extends BaseLevelScene {
 
     this.portalPosition = this.findObject('portal');
     this.spawnBoss();
+    this.startBossArenaWaves();
     this.events.off('enemyHpFloor', this.handleEnemyHpFloor, this);
     this.events.on('enemyHpFloor', this.handleEnemyHpFloor, this);
-    this.showObjective('Objetivo: derrota al Coloso de Piedra. Esquivá el aplastón cuando parpadee en rojo.');
+    this.showObjective('Objetivo: derrota al Coloso de Piedra. Esquivá el aplastón cuando parpadee en rojo — y cuidate de los escorpiones que patrullan la arena.');
   }
 
   spawnBoss() {
@@ -169,6 +170,9 @@ export default class Boss5Scene extends BaseLevelScene {
     if (!bossDefeated) return;
 
     this.rewardGiven = true;
+    // Se corta el oleaje: la arena tiene que poder quedar limpia para la
+    // tercera estrella y para entrar al portal sin persecucion.
+    this.stopBossArenaWaves();
     addScore(this, 250);
     this.spawnCoinCache(this.bossSpawnPoint.x, this.bossSpawnPoint.y, 20, 4);
     this.showObjective('¡Coloso de Piedra derrotado! Recogé las 80 monedas y entrá al portal.');
