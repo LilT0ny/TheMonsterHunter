@@ -32,10 +32,29 @@ export function addButton(scene, x, y, label, onClick, options = {}) {
   return { bg, text, setLabel: (nextLabel) => text.setText(nextLabel) };
 }
 
-export function addKeyboardHint(scene, text = 'WASD/Flechas: mover · Click/ESPACIO: disparar · SHIFT: dash · F: autodisparo · ESC o P: pausa') {
-  return scene.add.text(16, scene.scale.height - 28, text, {
+/**
+ * Recordatorio de controles. Se desvanece solo: es informacion de arranque, y
+ * dejarla fija satura un HUD que ya carga objetivo, score, vida y progreso.
+ * Los controles siguen consultables en cualquier momento desde la pausa.
+ */
+export function addKeyboardHint(scene, text = 'WASD/Flechas: mover · Click/ESPACIO: disparar · SHIFT: dash · F: autodisparo · ESC o P: pausa', fadeDelay = 9000) {
+  const hint = scene.add.text(16, scene.scale.height - 30, text, {
     fontFamily: 'Arial, sans-serif',
-    fontSize: '14px',
-    color: '#ffe6b3'
+    fontSize: '15px',
+    color: '#ffe6b3',
+    backgroundColor: 'rgba(29, 19, 13, 0.55)',
+    padding: { left: 8, right: 8, top: 4, bottom: 4 }
   }).setScrollFactor(0).setDepth(1000);
+
+  if (fadeDelay > 0) {
+    scene.tweens.add({
+      targets: hint,
+      alpha: 0,
+      delay: fadeDelay,
+      duration: 900,
+      onComplete: () => hint.destroy()
+    });
+  }
+
+  return hint;
 }

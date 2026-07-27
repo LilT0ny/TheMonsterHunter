@@ -53,15 +53,23 @@ export default class Level1Scene extends BaseLevelScene {
       'spider',
       'spider'
     ]);
+    // Nivel 1 es el primer contacto con el juego: las arañas aparecen mas lejos
+    // y mas separadas entre si, para que no lleguen todas juntas encima de un
+    // jugador que todavia esta aprendiendo los controles.
     const points = this.getRandomSafePoints(enemyPlan.length, {
       margin: 150,
-      minDistanceFromPlayer: 260,
-      minDistanceBetween: 105
+      minDistanceFromPlayer: 360,
+      minDistanceBetween: 120
     });
 
     enemyPlan.forEach((type, index) => {
-      const fallback = this.findObjects(type)[index] || this.getRandomSafePoint({ minDistanceFromPlayer: 260 });
-      const point = points[index] || fallback;
+      // Si faltan posiciones se reintenta un punto lejano ANTES de recurrir a
+      // los objetos del mapa: esos están donde estén, y podían dejar una araña
+      // encima del jugador, que es justo lo que se quiso evitar.
+      const point = points[index]
+        || this.getRandomSafePoint({ margin: 150, minDistanceFromPlayer: 360, attempts: 150 })
+        || this.findObjects(type)[index];
+
       if (point) {
         this.spawnEnemy(type, point.x, point.y);
       }

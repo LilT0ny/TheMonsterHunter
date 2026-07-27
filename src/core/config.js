@@ -170,6 +170,14 @@ export const REVIVE_HP_RATIO = 0.5;
 // Corazon de emergencia: aparece cada vez que un jugador cruza el 50% de vida.
 export const HEART_HEAL_RATIO = 0.3;
 
+// Ventana de seguridad al aparecer en un nivel. Da margen para ubicarse antes
+// de recibir el primer golpe, sobre todo a quien recien empieza.
+export const LEVEL_START_GRACE_MS = 2200;
+
+// El recordatorio de controles solo hace falta al principio. Dejarlo fijo suma
+// ruido a un HUD que ya muestra objetivo, score, vida, progreso y habilidades.
+export const HINT_FADE_DELAY_MS = 9000;
+
 // Autodisparo: se activa con la tecla F y apunta solo al enemigo mas cercano
 // dentro de este radio. La preferencia se guarda en el perfil.
 export const AUTO_FIRE_KEY = 'F';

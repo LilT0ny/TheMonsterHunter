@@ -6,6 +6,8 @@ import {
   ENEMY_SCORE,
   GAME_WIDTH,
   HEART_HEAL_RATIO,
+  HINT_FADE_DELAY_MS,
+  LEVEL_START_GRACE_MS,
   MAX_PLAYERS,
   PLAYER_PROFILES,
   REINFORCEMENT_POOLS,
@@ -58,6 +60,7 @@ export default class BaseLevelScene extends Phaser.Scene {
     this.levelFinished = false;
     this.enemyKills = 0;
     this.totalEnemiesSpawned = 0;
+    this.spawnGraceApplied = false;
     this.levelTitle = title;
     this.levelNumber = levelNumber;
     setLevel(this, levelNumber);
@@ -184,6 +187,8 @@ export default class BaseLevelScene extends Phaser.Scene {
 
     player.play(`${profile.texture}-idle`);
 
+    this.grantSpawnGrace(player);
+
     // Etiqueta J1/J2 solo cuando hay dos: en solitario seria ruido visual.
     const tag = this.add.text(x, y - 26, profile.label, {
       fontFamily: 'Arial Black, Arial, sans-serif',
@@ -216,11 +221,7 @@ export default class BaseLevelScene extends Phaser.Scene {
     const spawn = this.findSpotNear(anchor.x, anchor.y);
     const player = this.createPlayer(index, spawn.x, spawn.y);
 
-    // Dos segundos de gracia al entrar: sin esto J2 aparece al lado de J1, que
-    // suele estar en pleno combate, y come dano antes de tocar una tecla.
-    player.setData('nextDamageAt', this.time.now + 2000);
-    this.tweens.add({ targets: player, alpha: 0.35, yoyo: true, repeat: 3, duration: 250 });
-
+    // La ventana de gracia y el parpadeo ya los aplica createPlayer.
     // Las colisiones estan registradas contra playerGroup, no contra sprites
     // sueltos: por eso el jugador nuevo queda operativo sin registrar nada mas.
     this.cameras.main.flash(220, 140, 210, 255);
@@ -249,6 +250,30 @@ export default class BaseLevelScene extends Phaser.Scene {
       }
     }
     return { x, y };
+  }
+
+  /**
+   * Ventana de seguridad al aparecer: margen para ubicarse antes del primer
+   * golpe. El parpadeo la hace visible; sin él parece que el daño falla.
+   *
+   * @param {Phaser.GameObjects.Sprite} player
+   * @param {number} [now] reloj a usar. Durante create() `this.time.now` todavía
+   *        vale 0 —el reloj de la escena no arrancó— y en el primer frame salta
+   *        al tiempo global del juego, así que una gracia calculada ahí nace
+   *        vencida. Por eso al inicio del nivel se aplica desde update().
+   */
+  grantSpawnGrace(player, now = this.time.now) {
+    player.setData('nextDamageAt', now + LEVEL_START_GRACE_MS);
+    this.tweens.add({
+      targets: player,
+      alpha: 0.4,
+      yoyo: true,
+      repeat: Math.max(1, Math.floor(LEVEL_START_GRACE_MS / 500) - 1),
+      duration: 250,
+      onComplete: () => {
+        if (player.active && !player.getData('down')) player.setAlpha(1);
+      }
+    });
   }
 
   getActivePlayers() {
@@ -323,9 +348,13 @@ export default class BaseLevelScene extends Phaser.Scene {
     // Ya no dibujamos el nombre del nivel en grande sobre el mapa: UIScene lo
     // muestra de forma permanente en la barra superior, y el duplicado se
     // superponia con el HUD y con el cartel de objetivo.
-    addKeyboardHint(this, this.players.length > 1
-      ? `${PLAYER_PROFILES[0].hint}  |  ${PLAYER_PROFILES[1].hint}`
-      : undefined);
+    addKeyboardHint(
+      this,
+      this.players.length > 1
+        ? `${PLAYER_PROFILES[0].hint}  |  ${PLAYER_PROFILES[1].hint}`
+        : undefined,
+      HINT_FADE_DELAY_MS
+    );
 
     this.refreshPlayerTags();
   }
@@ -455,6 +484,13 @@ export default class BaseLevelScene extends Phaser.Scene {
 
   update(time, delta) {
     if (!this.player || this.levelFinished || this.overlayActive) return;
+
+    // Primer frame del nivel: acá `time` ya es el reloj real del juego, así que
+    // es el único momento fiable para arrancar la ventana de gracia inicial.
+    if (!this.spawnGraceApplied) {
+      this.spawnGraceApplied = true;
+      this.players.forEach((player) => this.grantSpawnGrace(player, time));
+    }
 
     this.updatePlayers(time, delta);
     this.updateRevives(time, delta);

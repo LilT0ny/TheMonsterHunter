@@ -19,33 +19,79 @@ una y cómo se solucionó técnicamente.
 
 ## 1. Matriz de asignación
 
-| #  | Mejora | Categoría | Archivos principales | Asignado |
-|----|--------|-----------|----------------------|----------|
-| 1  | Progreso persistente y "Continuar partida" | Interfaz (UI/UX) | `core/profile.js`, `core/runState.js`, `scenes/MenuScene.js` | |
-| 2  | Sistema de 3 estrellas por nivel | Interfaz (UI/UX) | `core/profile.js`, `core/config.js`, `scenes/BaseLevelScene.js` | |
-| 3  | Barra de progreso de enemigos en el HUD | Interfaz (UI/UX) | `scenes/UIScene.js` | |
-| 4  | Pantalla de introducción | Interfaz (UI/UX) | `scenes/IntroScene.js` | |
-| 5  | Menú de pausa | Interfaz (UI/UX) | `scenes/PauseScene.js`, `scenes/UIScene.js` | |
-| 6  | Remezcla de la mezcla de audio | Efectos de Sonido | `core/audio.js` | |
-| 7  | Banco de SFX ampliado | Efectos de Sonido | `core/audio.js` | |
-| 8  | Arma visible que apunta al objetivo | Animaciones | `scenes/PreloadScene.js`, `scenes/BaseLevelScene.js` | |
-| 9  | Flechas legibles con estela y fogonazo | Animaciones | `scenes/PreloadScene.js`, `scenes/BaseLevelScene.js` | |
-| 10 | Animación de caminata del arquero | Animaciones | `scenes/PreloadScene.js`, `scenes/BaseLevelScene.js` | |
-| 11 | Rediseño de todas las texturas de enemigos | Animaciones | `scenes/PreloadScene.js` | |
-| 12 | Rediseño de proyectiles enemigos | Animaciones | `scenes/PreloadScene.js` | |
-| 13 | Efectos elementales (fuego, hielo, rayo) | Animaciones | `scenes/PreloadScene.js`, `scenes/BaseLevelScene.js` | |
-| 14 | Textura de moneda | Animaciones | `scenes/PreloadScene.js` | |
-| 15 | Autodisparo activable con tecla | Jugabilidad (Game Feel) | `core/config.js`, `scenes/BaseLevelScene.js` | |
-| 16 | Flechas que no atraviesan muros | Jugabilidad (Game Feel) | `scenes/BaseLevelScene.js` | |
-| 17 | Corazón de emergencia al bajar del 50% | Jugabilidad (Game Feel) | `scenes/BaseLevelScene.js`, `core/config.js` | |
-| 18 | Cooperativo local de 2 jugadores | Jugabilidad (Game Feel) | `core/runState.js`, `scenes/BaseLevelScene.js` | |
-| 19 | Control del último jugador en pie | Jugabilidad (Game Feel) | `scenes/BaseLevelScene.js` | |
-| 20 | Cámara cooperativa corregida | Jugabilidad (Game Feel) | `scenes/BaseLevelScene.js` | |
-| 21 | Compañero ofrecido al morir | Jugabilidad (Game Feel) | `scenes/GameOverScene.js` | |
-| 22 | Arbustos de cobertura táctica | Diseño de Niveles | `scenes/BaseLevelScene.js`, `scenes/Level1Scene.js` | |
-| 23 | Enemigo que se duplica con el tiempo | Diseño de Niveles | `core/config.js`, `scenes/Level2Scene.js` | |
-| 24 | Curva de dificultad por cantidad | Diseño de Niveles | `core/config.js`, `scenes/BaseLevelScene.js` | |
-| 25 | Arenas de jefe pobladas | Diseño de Niveles | `core/config.js`, `scenes/Boss5Scene.js`, `scenes/Boss10Scene.js` | |
+La guía separa dos momentos: cada integrante **encuentra** hallazgos en sus
+corridas individuales, y después el equipo **asigna** las responsabilidades de
+implementación en consenso. Por eso la matriz tiene dos ejes distintos:
+
+- **Origen** — de qué bitácora salió el hallazgo. No se puede reasignar: es de
+  quien lo observó jugando.
+- **Implementa** — quién se hizo cargo del código. Se reparte en equipo, y puede
+  no coincidir con el origen.
+
+Las filas marcadas con ★ son las **6 mejoras oficiales del examen** (3 por
+integrante), elegidas para cubrir pilares distintos y poder demostrarse en
+segundos frente al evaluador.
+
+**Corridas:** `C1` `C2` `C3` = corrida 1, 2 o 3 de esa persona.
+
+| #  | Mejora | Categoría | Origen (bitácora) | Implementa |
+|----|--------|-----------|-------------------|------------|
+| 1  | Progreso persistente y "Continuar partida" | Interfaz (UI/UX) | Anthony · C1 · obs 1 | **Anthony ★** |
+| 2  | Sistema de 3 estrellas por nivel | Interfaz (UI/UX) | Anthony · C1 · obs 6 | Anthony |
+| 3  | Barra de progreso de enemigos en el HUD | Interfaz (UI/UX) | Anthony · C1 · obs 8 | Anthony |
+| 4  | Pantalla de introducción | Interfaz (UI/UX) | Anthony · C1 · obs 2 | Anael |
+| 5  | Menú de pausa | Interfaz (UI/UX) | Anthony · C1 · obs 5 | Anthony |
+| 6  | Remezcla de la mezcla de audio | Efectos de Sonido | Anthony · C1 · obs 7 | Anael |
+| 7  | Banco de SFX ampliado | Efectos de Sonido | Anthony · C1 · obs 7 (ampliación) | Anael |
+| 8  | Arma visible que apunta al objetivo | Animaciones | Anthony · C1 · obs 9 | Anael |
+| 9  | Flechas legibles con estela y fogonazo | Animaciones | Anthony · C1 · obs 9 | Anael |
+| 10 | Animación de caminata del arquero | Animaciones | Anthony · C3 · obs 1-2 | Anael |
+| 11 | Rediseño de todas las texturas de enemigos | Animaciones | Anthony · C3 · obs 3 | Anael |
+| 12 | Rediseño de proyectiles enemigos | Animaciones | Anthony · C3 · obs 4 | Anael |
+| 13 | Efectos elementales (fuego, hielo, rayo) | Animaciones | Anthony · C3 · obs 5 | Anael |
+| 14 | Textura de moneda | Animaciones | Anthony · C2 · obs 4 | Anael |
+| 15 | Autodisparo activable con tecla | Jugabilidad (Game Feel) | Anthony · C3 · obs 6 | **Anthony ★** |
+| 16 | Flechas que no atraviesan muros | Jugabilidad (Game Feel) | Anthony · C2 · obs 3 | Anthony |
+| 17 | Corazón de emergencia al bajar del 50% | Jugabilidad (Game Feel) | Anthony · C1 · obs 3 | Anael |
+| 18 | Cooperativo local de 2 jugadores | Jugabilidad (Game Feel) | Anthony · C1 · obs 11 | Anthony |
+| 19 | Control del último jugador en pie | Jugabilidad (Game Feel) | Anthony · C2 · obs 1 | Anthony |
+| 20 | Cámara cooperativa corregida | Jugabilidad (Game Feel) | Anthony · C2 · obs 2 | Anthony |
+| 21 | Compañero ofrecido al morir | Jugabilidad (Game Feel) | Anthony · C3 · obs 9 | Anthony |
+| 22 | Arbustos de cobertura táctica | Diseño de Niveles | Anthony · C1 · obs 4 | Anael |
+| 23 | Enemigo que se duplica con el tiempo | Diseño de Niveles | Anthony · C1 · obs 10 | Anthony |
+| 24 | Curva de dificultad por cantidad | Diseño de Niveles | Anthony · C3 · obs 7 | **Anthony ★** |
+| 25 | Arenas de jefe pobladas | Diseño de Niveles | Anthony · C3 · obs 8 | Anthony |
+| 26 | HUD que se descarga solo | Interfaz (UI/UX) | **Anael · C1 · obs 1** | **Anael ★** |
+| 27 | Ventana de seguridad al aparecer | Jugabilidad (Game Feel) | **Anael · C1 · obs 2** | **Anael ★** |
+| 28 | Copy y maquetación del Game Over | Interfaz (UI/UX) | Anthony · C2 · obs 5 | Anael |
+
+**Reparto de implementación:** Anthony 13 · Anael 15 · **Total 28**
+
+---
+
+### Las 6 mejoras oficiales del examen
+
+| Integrante | # | Mejora | Pilar | Origen | Cómo se demuestra |
+|---|---|---|---|---|---|
+| **Anthony** | 1 | Progreso persistente | Interfaz | propia · C1 | Jugar, cerrar el navegador, reabrir y pulsar *Continuar* |
+| **Anthony** | 15 | Autodisparo | Game Feel | propia · C3 | Pulsar **F**: el arco apunta solo y dispara |
+| **Anthony** | 24 | Curva de dificultad | Diseño de Niveles | propia · C3 | Comparar Nivel 1 (8 enemigos) contra Nivel 9 (22) |
+| **Anael** | 26 | HUD que se descarga solo | Interfaz | **propia · C1** | El recordatorio se desvanece a los 9 s; controles en la pausa |
+| **Anael** | 27 | Ventana de seguridad | Game Feel | **propia · C1** | Al entrar a un nivel el arquero parpadea y no recibe daño 2,2 s |
+| **Anael** | _(pendiente)_ | _(de corrida 2 o 3)_ | **Música** preferentemente | pendiente | — |
+
+**Cobertura de pilares entre los dos:** Interfaz, Game Feel, Diseño de Niveles,
+y el sexto slot está reservado para **Música**, que es el único pilar de la guía
+sin ninguna mejora en todo el catálogo.
+
+> **Falta un hallazgo.** Anael tiene 2 de sus 3 mejoras respaldadas por su propia
+> bitácora, que es la posición más sólida frente a la revisión. La tercera sale
+> de sus corridas 2 y 3.
+>
+> Si de esas corridas no surge nada de Música, el reemplazo recomendado es la
+> **#6 Remezcla de audio** (pilar Efectos de Sonido, ya implementada por Anael):
+> el hallazgo es de Anthony, pero la implementación y la explicación técnica son
+> suyas, que es exactamente lo que la guía pide de la asignación en consenso.
 
 ---
 
@@ -485,6 +531,72 @@ vacía, sin presión ambiental.
 **Detalle crítico.** El oleaje **se corta al caer el jefe**
 (`stopBossArenaWaves`). Sin eso la arena nunca se vaciaría y la tercera estrella
 —"no dejar ningún enemigo vivo"— quedaría permanentemente fuera de alcance.
+
+---
+
+#### 26. HUD que se descarga solo
+
+**Origen.** Bitácora de Anael Molina, corrida 1, observación #1.
+
+**Problema encontrado.** *"Hay bastante texto simultáneo en pantalla (objetivo,
+controles, score, vida, habilidades). En resolución de navegador algunas líneas
+se sienten pequeñas y saturadas para leer rápido mientras te movés."*
+
+**Solución técnica.** El recordatorio de controles era el único elemento
+permanente que solo hace falta al principio. Ahora `addKeyboardHint` se
+desvanece a los 9 s (`HINT_FADE_DELAY_MS`), sube de 14 a 15 px y recibe un fondo
+semitransparente que lo despega del suelo del mapa.
+
+Para no perder la información, **los controles pasaron al menú de pausa**, donde
+se consultan en cualquier momento y muestran los dos esquemas si hay dos
+jugadores. El layout de `PauseScene` se recalculó entero para alojarlos: sin
+eso, el bloque quedaba pisado por el botón *Reanudar*.
+
+---
+
+#### 27. Ventana de seguridad al aparecer
+
+**Origen.** Bitácora de Anael Molina, corrida 1, observación #2.
+
+**Problema encontrado.** *"La derrota llegó muy rápido. La dificultad inicial se
+percibe alta para un arranque: no hay margen para adaptarse a los controles
+antes de recibir presión."*
+
+**Solución técnica.** Dos medidas complementarias:
+
+1. **Invulnerabilidad de aparición** de 2,2 s (`LEVEL_START_GRACE_MS`) para todo
+   jugador que entra a un nivel, con parpadeo para que se vea. Reemplaza y
+   unifica la gracia que antes solo tenía el jugador 2 al sumarse en co-op.
+2. **Menos presión inicial en el Nivel 1**: las arañas aparecen a 360 px del
+   jugador en vez de 260, y más separadas entre sí, para que no lleguen todas
+   juntas encima de quien recién aprende los controles.
+
+**Detalle no obvio — y el defecto que costó encontrar.** La primera
+implementación calculaba la gracia dentro de `createPlayer` con
+`this.time.now + 2200`. Durante `create()` el reloj de la escena todavía vale
+**0**, y en el primer frame salta al tiempo global del juego (decenas de miles
+de milisegundos): la ventana nacía vencida y el daño entraba igual. La gracia
+inicial se aplica ahora desde el primer `update()`, que es el único momento en
+que `time` es fiable.
+
+Verificado: 1589 ms de gracia restante al aparecer, daño bloqueado durante la
+ventana y aplicado después. Distancia mínima de aparición medida con la física
+congelada: 409 px.
+
+---
+
+#### 28. Copy y maquetación del Game Over
+
+**Origen.** Bitácora de Anthony Gomez, corrida 2, observación #5.
+
+**Problema encontrado.** *"El texto 'Roguelike puro' sobra y suena a jerga.
+Además el bloque de texto queda pegado al título."*
+
+**Solución técnica.** Se reescribió el mensaje sin jerga y se rehízo la
+maquetación de la pantalla: cada bloque —resumen, estadísticas, estrellas a
+salvo— pasó a ser un objeto de texto independiente con posición explícita, en
+lugar de un único texto multilínea. Con el bloque único, agregar una línea
+descolocaba todo lo de abajo y el texto terminaba invadiendo el título.
 
 ---
 

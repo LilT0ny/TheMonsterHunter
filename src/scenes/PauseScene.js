@@ -1,4 +1,4 @@
-import { STAR_GOALS } from '../core/config.js';
+import { PLAYER_PROFILES, STAR_GOALS } from '../core/config.js';
 import { getPartyHealthRatio, getRun, loadRunIntoRegistry } from '../core/runState.js';
 import { readSavedRun } from '../core/profile.js';
 import { addButton, addPanel } from '../core/ui.js';
@@ -14,9 +14,9 @@ export default class PauseScene extends Phaser.Scene {
     this.levelTitle = data.levelTitle || 'Nivel';
 
     this.add.rectangle(480, 270, 960, 540, 0x000000, 0.62).setDepth(0);
-    addPanel(this, 480, 270, 660, 440, 0x21160f, 0.97).setDepth(1);
+    addPanel(this, 480, 272, 690, 484, 0x21160f, 0.97).setDepth(1);
 
-    this.add.text(480, 92, 'PAUSA', {
+    this.add.text(480, 74, 'PAUSA', {
       fontFamily: 'Arial Black, Arial, sans-serif',
       fontSize: '42px',
       color: '#ffd27f',
@@ -24,7 +24,7 @@ export default class PauseScene extends Phaser.Scene {
       strokeThickness: 6
     }).setOrigin(0.5).setDepth(2);
 
-    this.add.text(480, 130, this.levelTitle, {
+    this.add.text(480, 110, this.levelTitle, {
       fontFamily: 'Arial, sans-serif',
       fontSize: '16px',
       color: '#fff7df'
@@ -35,15 +35,15 @@ export default class PauseScene extends Phaser.Scene {
     // addButton crea en depth 0, y el panel de fondo esta en depth 1: sin subir
     // los botones quedan tapados por el propio panel.
     [
-      addButton(this, 480, 330, 'Reanudar', () => this.resumeLevel(), { width: 300 }),
-      addButton(this, 480, 386, 'Reiniciar nivel', () => this.restartLevel(), { width: 300, height: 40, fontSize: '16px' }),
-      addButton(this, 480, 436, 'Volver al menú', () => this.exitToMenu(), { width: 300, height: 40, fontSize: '16px' })
+      addButton(this, 480, 330, 'Reanudar', () => this.resumeLevel(), { width: 300, height: 44 }),
+      addButton(this, 480, 382, 'Reiniciar nivel', () => this.restartLevel(), { width: 300, height: 40, fontSize: '16px' }),
+      addButton(this, 480, 430, 'Volver al menú', () => this.exitToMenu(), { width: 300, height: 40, fontSize: '16px' })
     ].forEach(({ bg, text }) => {
       bg.setDepth(3);
       text.setDepth(4);
     });
 
-    this.add.text(480, 478, 'ESC o P para reanudar', {
+    this.add.text(480, 474, 'ESC o P para reanudar', {
       fontFamily: 'Arial, sans-serif',
       fontSize: '13px',
       color: '#ffe6b3'
@@ -63,14 +63,14 @@ export default class PauseScene extends Phaser.Scene {
     const perfect = Boolean(level?.hasClearedAllEnemies?.());
     const status = [cleared, healthy, perfect];
 
-    this.add.text(480, 166, 'OBJETIVOS DE ESTRELLA', {
+    this.add.text(480, 142, 'OBJETIVOS DE ESTRELLA', {
       fontFamily: 'Arial Black, Arial, sans-serif',
       fontSize: '14px',
       color: '#ffd27f'
     }).setOrigin(0.5).setDepth(2);
 
     STAR_GOALS.forEach((goal, index) => {
-      const y = 196 + index * 30;
+      const y = 170 + index * 28;
       this.add.image(250, y, status[index] ? 'starFull' : 'starEmpty')
         .setScale(0.75)
         .setDepth(2);
@@ -81,11 +81,23 @@ export default class PauseScene extends Phaser.Scene {
       }).setOrigin(0, 0.5).setDepth(2);
     });
 
-    const level3Hint = level?.enemyKills ?? 0;
-    this.add.text(480, 292, `Enemigos eliminados: ${level3Hint} de ${level?.requiredKills ?? '?'}`, {
+    this.add.text(480, 256, `Enemigos eliminados: ${level?.enemyKills ?? 0} de ${level?.requiredKills ?? '?'}`, {
       fontFamily: 'Arial, sans-serif',
       fontSize: '14px',
       color: '#ffe6b3'
+    }).setOrigin(0.5).setDepth(2);
+
+    // Los controles viven aca porque el recordatorio en pantalla se desvanece a
+    // los pocos segundos: tienen que poder consultarse cuando haga falta.
+    const coop = (level?.players?.length || 1) > 1;
+    this.add.text(480, 284, coop
+      ? `${PLAYER_PROFILES[0].hint}\n${PLAYER_PROFILES[1].hint}`
+      : PLAYER_PROFILES[0].hint, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '13px',
+      color: '#c9b78f',
+      align: 'center',
+      lineSpacing: 3
     }).setOrigin(0.5).setDepth(2);
   }
 
