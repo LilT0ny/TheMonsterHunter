@@ -65,7 +65,8 @@ export default class Level6Scene extends BaseLevelScene {
       });
     });
 
-    this.physics.add.collider(this.player, this.platforms);
+    // Contra el grupo, no contra J1: asi el jugador 2 tambien monta plataformas.
+    this.physics.add.collider(this.playerGroup, this.platforms);
     if (this.wallsLayer) this.physics.add.collider(this.platforms, this.wallsLayer);
   }
 

@@ -1,4 +1,5 @@
 import { getRun, resetRun } from '../core/runState.js';
+import { clearSavedRun, getMaxTotalStars, getTotalStars, markRunCompleted } from '../core/profile.js';
 import { addButton, addPanel } from '../core/ui.js';
 import { getAudio } from '../core/audio.js';
 
@@ -23,9 +24,14 @@ export default class VictoryScene extends Phaser.Scene {
       strokeThickness: 6
     }).setOrigin(0.5);
 
+    markRunCompleted(this, run.score);
+    clearSavedRun();
+
     const skills = run.skills.length > 0 ? run.skills.join(', ') : 'Ninguna';
+    const hp = run.players.map((player) => `${player.hp}/${run.hpMax}`).join(' · ');
+    const stars = `${getTotalStars(this)} / ${getMaxTotalStars()}`;
     this.add.text(480, 215,
-      `Derrotaste al Rey Escorpión y completaste los 10 niveles de The Monster Hunter.\n\nScore: ${run.score}\nMonedas restantes: ${run.coins}\nHP final: ${run.hp}/${run.hpMax}\nHabilidades: ${skills}`,
+      `Derrotaste al Rey Escorpión y completaste los 10 niveles de The Monster Hunter.\n\nScore: ${run.score}\nMonedas restantes: ${run.coins}\nHP final: ${hp}\nHabilidades: ${skills}\nEstrellas totales: ${stars}`,
       {
         fontFamily: 'Arial, sans-serif',
         fontSize: '20px',

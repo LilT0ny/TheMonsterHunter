@@ -1,5 +1,5 @@
 import { UPGRADES } from '../core/config.js';
-import { buyUpgrade, getDerivedStats, getRun, saveRun } from '../core/runState.js';
+import { buyUpgrade, getDerivedStats, getRun, restoreParty } from '../core/runState.js';
 import { addButton, addPanel } from '../core/ui.js';
 
 export default class TiendaScene extends Phaser.Scene {
@@ -42,9 +42,8 @@ export default class TiendaScene extends Phaser.Scene {
       : `Continuar al Nivel ${this.levelCompleted + 1}`;
 
     addButton(this, 480, 488, continueLabel, () => {
-      const run = getRun(this);
-      run.hp = run.hpMax;
-      saveRun(this, run);
+      // Entre niveles el equipo entero se cura y los caidos vuelven en pie.
+      restoreParty(this);
       this.scene.start(this.nextLevelScene);
     }, { width: 280 });
   }
@@ -82,6 +81,7 @@ export default class TiendaScene extends Phaser.Scene {
   refreshInfo() {
     const run = getRun(this);
     const stats = getDerivedStats(run);
-    this.infoText.setText(`Monedas: ${run.coins} | HP: ${run.hp}/${run.hpMax} | Daño: ${stats.arrowDamage} | Velocidad: ${Math.round(stats.moveSpeed)}`);
+    const hp = run.players.map((player) => `${player.hp}/${run.hpMax}`).join(' · ');
+    this.infoText.setText(`Monedas: ${run.coins} | HP: ${hp} | Daño: ${stats.arrowDamage} | Velocidad: ${Math.round(stats.moveSpeed)}`);
   }
 }

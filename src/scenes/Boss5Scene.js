@@ -80,8 +80,12 @@ export default class Boss5Scene extends BaseLevelScene {
   }
 
   updateBossPhase1(time) {
-    const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
-    const distance = Phaser.Math.Distance.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+    // En co-op el Coloso persigue al jugador vivo mas cercano, no siempre a J1.
+    const target = this.getNearestPlayer(this.boss.x, this.boss.y);
+    if (!target) return;
+
+    const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, target.x, target.y);
+    const distance = Phaser.Math.Distance.Between(this.boss.x, this.boss.y, target.x, target.y);
 
     if (this.bossState === 'approach') {
       this.physics.velocityFromRotation(angle, APPROACH_SPEED, this.boss.body.velocity);
@@ -122,10 +126,9 @@ export default class Boss5Scene extends BaseLevelScene {
   performSlam(time) {
     if (this.boss.active) {
       this.boss.clearTint();
-      const distance = Phaser.Math.Distance.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
-      if (distance <= SLAM_RADIUS) {
-        this.applyDamageToPlayer(SLAM_DAMAGE);
-      }
+      // El aplastamiento es dano en area: alcanza a los dos jugadores si ambos
+      // quedaron dentro del circulo telegrafiado.
+      this.damagePlayersInRadius(this.boss.x, this.boss.y, SLAM_RADIUS, SLAM_DAMAGE);
       this.cameras.main.shake(220, 0.012);
       getAudio(this)?.playSfx('golemCreak');
     }

@@ -1,6 +1,8 @@
 import { GAME_HEIGHT, GAME_WIDTH } from './core/config.js';
 import PreloadScene from './scenes/PreloadScene.js';
 import MenuScene from './scenes/MenuScene.js';
+import IntroScene from './scenes/IntroScene.js';
+import PauseScene from './scenes/PauseScene.js';
 import Level1Scene from './scenes/Level1Scene.js';
 import Level2Scene from './scenes/Level2Scene.js';
 import Level3Scene from './scenes/Level3Scene.js';
@@ -38,6 +40,7 @@ const config = {
   scene: [
     PreloadScene,
     MenuScene,
+    IntroScene,
     Level1Scene,
     Level2Scene,
     Level3Scene,
@@ -51,12 +54,16 @@ const config = {
     AbilityScene,
     TiendaScene,
     UIScene,
+    PauseScene,
     GameOverScene,
     VictoryScene
   ]
 };
 
 window.addEventListener('load', () => {
-  // eslint-disable-next-line no-new
-  new Phaser.Game(config);
+  // Se expone en window para poder inspeccionar y probar desde la consola del
+  // navegador, por ejemplo:
+  //   __game.scene.getScene('Level3Scene').joinPlayerTwo()
+  //   __game.registry.get('run')
+  window.__game = new Phaser.Game(config);
 });

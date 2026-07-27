@@ -22,6 +22,7 @@ export default class AudioManager {
     this.muted = typeof localStorage !== 'undefined' && localStorage.getItem(MUTE_STORAGE_KEY) === '1';
     this.currentMusic = null;
     this.foleyNodes = {};
+    this.footstepToggle = false;
   }
 
   ensureContext() {
@@ -39,8 +40,10 @@ export default class AudioManager {
     this.musicGain.gain.value = 0.35;
     this.musicGain.connect(this.masterGain);
 
+    // El bus de SFX subio de 0.5 a 0.72: con 0.5 el disparo quedaba en 0.08 de
+    // volumen real y el paso en 0.025, o sea practicamente inaudibles.
     this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.value = 0.5;
+    this.sfxGain.gain.value = 0.72;
     this.sfxGain.connect(this.masterGain);
 
     this.foleyGain = this.ctx.createGain();
@@ -127,7 +130,12 @@ export default class AudioManager {
     if (!this.ctx) return;
     switch (name) {
       case 'shoot':
-        this.playTone({ freq: 880, freqEnd: 440, duration: 0.08, type: 'triangle', gain: 0.16 });
+        // Tres capas para que el disparo se NOTE: chasquido de cuerda, cuerpo
+        // tonal y silbido de la flecha al salir.
+        this.playNoise({ duration: 0.05, gain: 0.34, filterFreq: 2600, filterType: 'highpass' });
+        this.playTone({ freq: 940, freqEnd: 320, duration: 0.11, type: 'triangle', gain: 0.4 });
+        this.playTone({ freq: 300, freqEnd: 140, duration: 0.13, type: 'square', gain: 0.16, delay: 0.01 });
+        this.playNoise({ duration: 0.16, gain: 0.12, filterFreq: 1500, filterType: 'bandpass', delay: 0.03 });
         break;
       case 'hit':
         this.playTone({ freq: 220, freqEnd: 90, duration: 0.09, type: 'square', gain: 0.18 });
@@ -154,8 +162,51 @@ export default class AudioManager {
         this.playNoise({ duration: 0.5, gain: 0.32, filterFreq: 200, filterType: 'lowpass' });
         this.playTone({ freq: 110, freqEnd: 55, duration: 0.6, type: 'sawtooth', gain: 0.24, delay: 0.05 });
         break;
-      case 'footstep':
-        this.playNoise({ duration: 0.05, gain: 0.05, filterFreq: 1800, filterType: 'highpass' });
+      case 'footstep': {
+        // Alterna pie izquierdo/derecho cambiando el brillo del filtro, para que
+        // caminar suene a caminar y no a un click repetido.
+        this.footstepToggle = !this.footstepToggle;
+        const filterFreq = this.footstepToggle ? 1500 : 1150;
+        this.playNoise({ duration: 0.07, gain: 0.2, filterFreq, filterType: 'bandpass' });
+        this.playTone({ freq: this.footstepToggle ? 130 : 108, freqEnd: 62, duration: 0.06, type: 'sine', gain: 0.12 });
+        break;
+      }
+      case 'heart':
+        [660, 880, 1320].forEach((freq, i) => this.playTone({
+          freq, duration: 0.18, type: 'sine', gain: 0.26, delay: i * 0.07
+        }));
+        break;
+      case 'down':
+        this.playTone({ freq: 420, freqEnd: 70, duration: 0.7, type: 'sawtooth', gain: 0.3 });
+        this.playNoise({ duration: 0.45, gain: 0.2, filterFreq: 380, filterType: 'lowpass' });
+        break;
+      case 'revive':
+        [392, 523, 659, 784].forEach((freq, i) => this.playTone({
+          freq, duration: 0.24, type: 'triangle', gain: 0.24, delay: i * 0.08
+        }));
+        break;
+      case 'split':
+        this.playTone({ freq: 240, freqEnd: 520, duration: 0.2, type: 'square', gain: 0.22 });
+        this.playNoise({ duration: 0.22, gain: 0.2, filterFreq: 900, filterType: 'bandpass', delay: 0.04 });
+        break;
+      case 'star':
+        [784, 988, 1319].forEach((freq, i) => this.playTone({
+          freq, duration: 0.3, type: 'triangle', gain: 0.3, delay: i * 0.16
+        }));
+        break;
+      case 'playerJoin':
+        [330, 415, 494, 659].forEach((freq, i) => this.playTone({
+          freq, duration: 0.26, type: 'triangle', gain: 0.28, delay: i * 0.1
+        }));
+        break;
+      case 'pause':
+        this.playTone({ freq: 620, freqEnd: 300, duration: 0.16, type: 'sine', gain: 0.24 });
+        break;
+      case 'unpause':
+        this.playTone({ freq: 300, freqEnd: 620, duration: 0.16, type: 'sine', gain: 0.24 });
+        break;
+      case 'uiSelect':
+        this.playTone({ freq: 720, duration: 0.07, type: 'square', gain: 0.16 });
         break;
       case 'golemCreak':
         this.playTone({ freq: 90, freqEnd: 58, duration: 0.6, type: 'sawtooth', gain: 0.18 });

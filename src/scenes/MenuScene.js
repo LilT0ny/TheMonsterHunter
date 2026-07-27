@@ -1,4 +1,15 @@
-import { resetRun, setLevel } from '../core/runState.js';
+import { LEVEL_SEQUENCE, STARS_PER_LEVEL, labelForLevel } from '../core/config.js';
+import { loadRunIntoRegistry, resetRun, setLevel } from '../core/runState.js';
+import {
+  getMaxTotalStars,
+  getProfile,
+  getStars,
+  getTotalStars,
+  isIntroSeen,
+  isLevelUnlocked,
+  readSavedRun,
+  resetProfile
+} from '../core/profile.js';
 import { addButton, addPanel } from '../core/ui.js';
 import { getAudio } from '../core/audio.js';
 
@@ -18,14 +29,14 @@ export default class MenuScene extends Phaser.Scene {
     audio?.stopAllFoley();
     audio?.stopMusic();
 
-    addPanel(this, 480, 270, 740, 510, 0x21160f, 0.88);
+    addPanel(this, 480, 270, 900, 512, 0x21160f, 0.9);
 
-    const muteButton = addButton(this, 792, 34, audio?.isMuted() ? 'Sonido: OFF' : 'Sonido: ON', () => {
+    const muteButton = addButton(this, 872, 32, audio?.isMuted() ? 'Sonido: OFF' : 'Sonido: ON', () => {
       const muted = audio?.toggleMute();
       muteButton.setLabel(muted ? 'Sonido: OFF' : 'Sonido: ON');
-    }, { width: 114, height: 30, fontSize: '12px' });
+    }, { width: 114, height: 28, fontSize: '12px' });
 
-    this.add.text(480, 56, 'THE MONSTER HUNTER', {
+    this.add.text(480, 46, 'THE MONSTER HUNTER', {
       fontFamily: 'Arial Black, Arial, sans-serif',
       fontSize: '32px',
       color: '#ffd27f',
@@ -33,79 +44,164 @@ export default class MenuScene extends Phaser.Scene {
       strokeThickness: 6
     }).setOrigin(0.5);
 
-    this.add.text(480, 90, 'RPG · Roguelike · Pixel Art · Phaser 3 + Tiled', {
+    this.add.text(480, 78, 'RPG · Roguelike · Pixel Art · Phaser 3 + Tiled', {
       fontFamily: 'Arial, sans-serif',
-      fontSize: '14px',
+      fontSize: '13px',
       color: '#ffe6b3'
     }).setOrigin(0.5);
 
-    this.add.text(480, 120,
-      'Sobrevive, dispara flechas, recoge monedas y mejora tus stats.\nSi mueres, pierdes todo y vuelves a nivel 1.',
-      {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '14px',
-        align: 'center',
-        color: '#fff7df',
-        lineSpacing: 4
-      }).setOrigin(0.5);
-
-    addButton(this, 480, 168, 'Nueva partida — Nivel 1', () => {
-      resetRun(this);
-      this.scene.start('Level1Scene');
-    }, { width: 320, height: 40 });
-
-    this.add.text(480, 202, 'Probar nivel directamente:', {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '14px',
-      color: '#ffe6b3'
-    }).setOrigin(0.5);
-
-    const testLevels = [
-      { levelNumber: 2, sceneKey: 'Level2Scene', label: 'Nivel 2' },
-      { levelNumber: 3, sceneKey: 'Level3Scene', label: 'Nivel 3' },
-      { levelNumber: 4, sceneKey: 'Level4Scene', label: 'Nivel 4' },
-      { levelNumber: 5, sceneKey: 'Boss5Scene', label: 'Boss 5' },
-      { levelNumber: 6, sceneKey: 'Level6Scene', label: 'Nivel 6' },
-      { levelNumber: 7, sceneKey: 'Level7Scene', label: 'Nivel 7' },
-      { levelNumber: 8, sceneKey: 'Level8Scene', label: 'Nivel 8' },
-      { levelNumber: 9, sceneKey: 'Level9Scene', label: 'Nivel 9' },
-      { levelNumber: 10, sceneKey: 'Boss10Scene', label: 'Boss 10' }
-    ];
-
-    testLevels.forEach(({ levelNumber, sceneKey, label }, index) => {
-      const row = Math.floor(index / 3);
-      const col = index % 3;
-      const x = 480 + (col - 1) * 110;
-      const y = 232 + row * 36;
-      addButton(this, x, y, label, () => {
-        resetRun(this);
-        setLevel(this, levelNumber);
-        this.scene.start(sceneKey);
-      }, { width: 100, height: 32, fontSize: '13px' });
-    });
-
-    addButton(this, 480, 350, 'Controles', () => this.showControls(), { width: 320, height: 40 });
+    this.renderStarCounter();
+    this.renderMainActions();
+    this.renderLevelGrid();
+    this.renderFooter();
   }
 
-  showControls() {
-    const panel = addPanel(this, 480, 270, 620, 260, 0x160f0a, 0.96).setDepth(20);
-    const text = this.add.text(480, 250,
-      'CONTROLES\n\nWASD o flechas: mover al arquero\nClick izquierdo: disparar hacia el cursor\nESPACIO: disparar hacia la última dirección\nESC: volver al menú desde un nivel',
+  renderStarCounter() {
+    const total = getTotalStars(this);
+    const max = getMaxTotalStars();
+
+    this.add.image(432, 104, 'starFull').setScale(0.8);
+    this.add.text(452, 104, `${total} / ${max} estrellas`, {
+      fontFamily: 'Arial Black, Arial, sans-serif',
+      fontSize: '17px',
+      color: total >= max ? '#8dffa1' : '#ffd27f'
+    }).setOrigin(0, 0.5);
+  }
+
+  renderMainActions() {
+    const saved = readSavedRun();
+
+    if (saved) {
+      addButton(this, 352, 148, `Continuar — ${labelForLevel(saved.run.level)}`, () => {
+        loadRunIntoRegistry(this, saved.run);
+        getAudio(this)?.playSfx('uiSelect');
+        this.scene.start(saved.sceneKey);
+      }, { width: 250, height: 42, fontSize: '16px' });
+
+      addButton(this, 608, 148, 'Nueva partida', () => this.startNewRun(), {
+        width: 250, height: 42, fontSize: '16px'
+      });
+    } else {
+      addButton(this, 480, 148, 'Nueva partida — Nivel 1', () => this.startNewRun(), {
+        width: 320, height: 42
+      });
+    }
+
+    addButton(this, 480, 196, 'Cómo se juega', () => {
+      getAudio(this)?.playSfx('uiSelect');
+      this.scene.start('IntroScene', { returnToMenu: true });
+    }, { width: 240, height: 34, fontSize: '15px' });
+  }
+
+  startNewRun() {
+    resetRun(this);
+    getAudio(this)?.playSfx('uiSelect');
+    // La primera vez explicamos el juego; despues arranca directo.
+    this.scene.start(isIntroSeen(this) ? 'Level1Scene' : 'IntroScene', { nextScene: 'Level1Scene' });
+  }
+
+  renderLevelGrid() {
+    const maxUnlocked = getProfile(this).maxLevelUnlocked;
+
+    this.add.text(480, 234, `Niveles desbloqueados: ${maxUnlocked} de ${LEVEL_SEQUENCE.length}`, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '14px',
+      color: '#ffe6b3'
+    }).setOrigin(0.5);
+
+    LEVEL_SEQUENCE.forEach(({ level, sceneKey, label }, index) => {
+      const row = Math.floor(index / 5);
+      const col = index % 5;
+      const x = 480 + (col - 2) * 104;
+      const y = 274 + row * 74;
+      const unlocked = isLevelUnlocked(this, level);
+
+      const button = addButton(this, x, y, unlocked ? label : `${label} 🔒`, () => {
+        if (!unlocked) {
+          this.flashLockedMessage(level);
+          return;
+        }
+        resetRun(this);
+        setLevel(this, level);
+        getAudio(this)?.playSfx('uiSelect');
+        this.scene.start(sceneKey);
+      }, { width: 94, height: 30, fontSize: '12px' });
+
+      if (!unlocked) {
+        button.bg.setFillStyle(0x3a2a1c, 0.9);
+        button.text.setColor('#8d7a63');
+      }
+
+      this.renderLevelStars(x, y + 24, getStars(this, level));
+    });
+  }
+
+  renderLevelStars(x, y, earned) {
+    for (let i = 0; i < STARS_PER_LEVEL; i += 1) {
+      this.add.image(x + (i - 1) * 17, y, i < earned ? 'starFull' : 'starEmpty').setScale(0.52);
+    }
+  }
+
+  flashLockedMessage(level) {
+    if (this.lockedMessage) this.lockedMessage.destroy();
+    this.lockedMessage = this.add.text(480, 424, `El ${labelForLevel(level)} todavía está bloqueado. Completá los niveles anteriores.`, {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '15px',
+      color: '#ffb3a7'
+    }).setOrigin(0.5).setDepth(30);
+
+    this.tweens.add({
+      targets: this.lockedMessage,
+      alpha: 0,
+      delay: 1800,
+      duration: 500,
+      onComplete: () => {
+        this.lockedMessage?.destroy();
+        this.lockedMessage = null;
+      }
+    });
+  }
+
+  renderFooter() {
+    this.add.text(480, 452,
+      'Si morís perdés habilidades y mejoras, pero las estrellas y los niveles desbloqueados quedan guardados.',
       {
         fontFamily: 'Arial, sans-serif',
-        fontSize: '20px',
-        color: '#fff2cc',
-        align: 'center',
-        lineSpacing: 8
-      }).setOrigin(0.5).setDepth(21);
+        fontSize: '13px',
+        color: '#fff7df',
+        align: 'center'
+      }).setOrigin(0.5);
 
-    const close = addButton(this, 480, 385, 'Cerrar', () => {
-      panel.destroy();
-      text.destroy();
-      close.bg.destroy();
-      close.text.destroy();
-    }, { width: 180 });
-    close.bg.setDepth(21);
-    close.text.setDepth(22);
+    addButton(this, 480, 492, 'Borrar progreso guardado', () => this.confirmReset(), {
+      width: 260, height: 30, fontSize: '13px'
+    });
+  }
+
+  confirmReset() {
+    if (this.resetPending) {
+      resetProfile(this);
+      resetRun(this);
+      this.resetPending = false;
+      this.scene.restart();
+      return;
+    }
+
+    this.resetPending = true;
+    this.flashResetWarning();
+  }
+
+  flashResetWarning() {
+    if (this.resetWarning) this.resetWarning.destroy();
+    this.resetWarning = this.add.text(480, 424, 'Esto borra estrellas y partida guardada. Tocá de nuevo para confirmar.', {
+      fontFamily: 'Arial Black, Arial, sans-serif',
+      fontSize: '14px',
+      color: '#ffb3a7'
+    }).setOrigin(0.5).setDepth(30);
+
+    this.time.delayedCall(3000, () => {
+      this.resetPending = false;
+      this.resetWarning?.destroy();
+      this.resetWarning = null;
+    });
   }
 }

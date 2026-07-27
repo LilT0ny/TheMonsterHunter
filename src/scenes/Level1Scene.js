@@ -20,9 +20,12 @@ export default class Level1Scene extends BaseLevelScene {
 
     this.requiredKills = 8;
     this.portalPosition = this.pickRandomPortalPosition();
+    // Los arbustos van primero: son cobertura, y las aranas tienen que aparecer
+    // repartidas alrededor de ellos, no encima.
+    this.spawnBushes(16);
     this.spawnRandomEnemies();
     this.spawnRandomCoinCaches();
-    this.showObjective('Objetivo: explora el desierto, elimina enemigos y busca el portal.');
+    this.showObjective('Objetivo: elimina 8 enemigos y busca el portal. Usa los arbustos como cobertura: frenan a las arañas, pero tus flechas los atraviesan.');
   }
 
   checkLevelCompletion() {

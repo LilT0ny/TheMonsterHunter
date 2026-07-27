@@ -18,11 +18,12 @@ export default class Level2Scene extends BaseLevelScene {
       musicMood: 'calm'
     });
 
-    this.requiredKills = 7;
+    this.requiredKills = 10;
     this.portalPosition = this.pickRandomPortalPosition();
+    this.spawnBushes(10);
     this.spawnRandomEnemies();
     this.spawnRandomCoinCaches();
-    this.showObjective('Objetivo: esquiva el disparo de los escorpiones centinela y encuentra al escorpión de élite.');
+    this.showObjective('Objetivo: matá a los limos VERDES rápido — cada uno se parte en dos si lo dejás vivo demasiado tiempo.');
   }
 
   checkLevelCompletion() {
@@ -60,6 +61,25 @@ export default class Level2Scene extends BaseLevelScene {
     if (elitePoint) {
       this.spawnEnemy('scorpion_elite', elitePoint.x, elitePoint.y);
     }
+
+    this.spawnSlimes();
+  }
+
+  /**
+   * Los limos verdes son el reloj del nivel: cada uno se parte en dos a los 7
+   * segundos, y esos hijos vuelven a partirse una vez mas. Dejarlos vivos no te
+   * castiga con dano, te castiga con cantidad.
+   */
+  spawnSlimes() {
+    const points = this.getRandomSafePoints(3, {
+      margin: 160,
+      minDistanceFromPlayer: 340,
+      minDistanceBetween: 210
+    });
+
+    points.forEach((point) => {
+      this.spawnEnemy('slime_green', point.x, point.y);
+    });
   }
 
   spawnRandomCoinCaches() {

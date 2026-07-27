@@ -94,9 +94,78 @@ export const ENEMY_SCORE = {
   mummy: 22,
   serpent: 26,
   mummy_giant: 45,
+  slime_green: 14,
   boss_golem: 200,
   golem_fragment: 60,
   sand_spirit: 35,
   guardian: 55,
   boss_king_scorpion: 300
 };
+
+// Orden canonico de la campana. Lo consumen el menu, el perfil persistido y la
+// pantalla de estrellas, para que exista una sola fuente de verdad del recorrido.
+export const LEVEL_SEQUENCE = [
+  { level: 1, sceneKey: 'Level1Scene', label: 'Nivel 1' },
+  { level: 2, sceneKey: 'Level2Scene', label: 'Nivel 2' },
+  { level: 3, sceneKey: 'Level3Scene', label: 'Nivel 3' },
+  { level: 4, sceneKey: 'Level4Scene', label: 'Nivel 4' },
+  { level: 5, sceneKey: 'Boss5Scene', label: 'Boss 5' },
+  { level: 6, sceneKey: 'Level6Scene', label: 'Nivel 6' },
+  { level: 7, sceneKey: 'Level7Scene', label: 'Nivel 7' },
+  { level: 8, sceneKey: 'Level8Scene', label: 'Nivel 8' },
+  { level: 9, sceneKey: 'Level9Scene', label: 'Nivel 9' },
+  { level: 10, sceneKey: 'Boss10Scene', label: 'Boss 10' }
+];
+
+export const TOTAL_LEVELS = LEVEL_SEQUENCE.length;
+export const STARS_PER_LEVEL = 3;
+
+export function sceneKeyForLevel(level) {
+  return LEVEL_SEQUENCE.find((entry) => entry.level === level)?.sceneKey || 'Level1Scene';
+}
+
+export function labelForLevel(level) {
+  return LEVEL_SEQUENCE.find((entry) => entry.level === level)?.label || `Nivel ${level}`;
+}
+
+// Criterios de las 3 estrellas. Se evaluan al completar el nivel.
+export const STAR_GOALS = [
+  { id: 'clear', label: 'Completar el nivel' },
+  { id: 'health', label: 'Terminar con más del 50% de vida' },
+  { id: 'full', label: 'Eliminar a todos los enemigos' }
+];
+
+// Un perfil por jugador. El indice es la posicion dentro de run.players.
+// J1 conserva los controles historicos; J2 usa el bloque de flechas para que
+// las dos personas entren comodas en el mismo teclado.
+export const PLAYER_PROFILES = [
+  {
+    index: 0,
+    label: 'J1',
+    texture: 'archer',
+    accent: 0xffd27f,
+    keys: { up: 'W', down: 'S', left: 'A', right: 'D', shoot: 'SPACE', dash: 'SHIFT' },
+    usesPointer: true,
+    hint: 'J1: WASD · Click/ESPACIO disparar · SHIFT dash'
+  },
+  {
+    index: 1,
+    label: 'J2',
+    texture: 'archer2',
+    accent: 0x8fd6ff,
+    keys: { up: 'UP', down: 'DOWN', left: 'LEFT', right: 'RIGHT', shoot: 'ENTER', dash: 'CTRL' },
+    usesPointer: false,
+    hint: 'J2: Flechas · ENTER disparar · CTRL dash'
+  }
+];
+
+export const MAX_PLAYERS = PLAYER_PROFILES.length;
+
+// Reanimacion cooperativa: un jugador caido vuelve si su companero se queda
+// cerca el tiempo suficiente. Sin esto, el co-op se corta al primer error.
+export const REVIVE_RADIUS = 62;
+export const REVIVE_DURATION = 2400;
+export const REVIVE_HP_RATIO = 0.5;
+
+// Corazon de emergencia: aparece cada vez que un jugador cruza el 50% de vida.
+export const HEART_HEAL_RATIO = 0.3;

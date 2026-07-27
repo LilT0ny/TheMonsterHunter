@@ -79,8 +79,12 @@ export default class Boss10Scene extends BaseLevelScene {
   }
 
   updateBoss(time) {
-    const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
-    const distance = Phaser.Math.Distance.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+    // El Rey Escorpion encara al jugador vivo mas cercano.
+    const target = this.getNearestPlayer(this.boss.x, this.boss.y);
+    if (!target) return;
+
+    const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, target.x, target.y);
+    const distance = Phaser.Math.Distance.Between(this.boss.x, this.boss.y, target.x, target.y);
     const speed = this.boss.getData('speed');
 
     if (this.bossState === 'holding') {
@@ -124,12 +128,22 @@ export default class Boss10Scene extends BaseLevelScene {
   performSwipe(time) {
     if (this.boss.active) {
       const facingAngle = this.boss.getData('facingAngle') || 0;
-      const originAngle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
-      const distance = Phaser.Math.Distance.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
-      const withinArc = Math.abs(Phaser.Math.Angle.Wrap(originAngle - facingAngle)) < ARC_HALF_ANGLE;
 
-      if (distance <= ARC_RADIUS && withinArc) {
-        this.applyDamageToPlayer(this.tailDamage);
+      // El golpe de cola barre un arco: cada jugador se evalua por separado, asi
+      // uno puede esquivar poniendose al costado aunque el otro coma el golpe.
+      let hitSomeone = false;
+      this.getActivePlayers().forEach((player) => {
+        const originAngle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, player.x, player.y);
+        const distance = Phaser.Math.Distance.Between(this.boss.x, this.boss.y, player.x, player.y);
+        const withinArc = Math.abs(Phaser.Math.Angle.Wrap(originAngle - facingAngle)) < ARC_HALF_ANGLE;
+
+        if (distance <= ARC_RADIUS && withinArc) {
+          this.applyDamageToPlayer(this.tailDamage, player);
+          hitSomeone = true;
+        }
+      });
+
+      if (hitSomeone) {
         this.cameras.main.shake(200, 0.01);
       }
     }
